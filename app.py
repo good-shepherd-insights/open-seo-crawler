@@ -461,6 +461,12 @@ def _cb_fetch_sitemap_urls(base_url, ua):
             if r.status_code != 200:
                 return
             c = r.text
+            # A .xml.gz sitemap served as a file arrives still compressed
+            # (no Content-Encoding header for requests to undo). Spot the
+            # gzip magic bytes and inflate it, or its URLs are never counted.
+            if r.content[:2] == b'\x1f\x8b':
+                import gzip
+                c = gzip.decompress(r.content).decode('utf-8', errors='ignore')
             if '<sitemapindex' in c:
                 for m in _re.findall(r'<loc>\s*(.*?)\s*</loc>', c):
                     parse(_html2.unescape(m.strip()), depth + 1)
@@ -1850,15 +1856,23 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
             # Decide whether to retry, fall back UA, or accept the response.
             if resp is not None:
                 if resp.status_code == 429:
-                    # Respect Retry-After header if present, else exponential wait.
+                    # Respect Retry-After (capped at 120s so a bad header cannot
+                    # stall the crawl for hours), else exponential wait. The
+                    # hint lets the outer loop pause the whole host, and a 429
+                    # that survives every retry is flagged so the outer loop
+                    # requeues the URL instead of recording an error row:
+                    # retries here alone cannot win while other workers are
+                    # still hitting the same host.
                     ra = resp.headers.get('Retry-After', '').strip()
                     try: wait = float(ra) if ra else 2 * (2 ** attempt)
                     except ValueError: wait = 2 * (2 ** attempt)
-                    wait = min(wait, 10)
+                    wait = min(wait, 120)
+                    result['_retry_hint'] = wait
                     if attempt < 2:
                         retries_done += 1
                         time.sleep(wait)
                         continue
+                    result['_rate_limited'] = True
                 elif 500 <= resp.status_code < 600:
                     # WAF block-page check — Wordfence/Cloudflare/Sucuri 503s.
                     # Retrying just escalates the block, so bail and let the
@@ -2862,15 +2876,21 @@ _SITEMAP_DEFAULT_PATHS = (
     '/post-sitemap.xml', '/page-sitemap.xml',
 )
 _SITEMAP_NS = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+# host -> (time, [sitemap entries]); see _discover_sitemaps.
+_SITEMAP_DISCOVERY_CACHE = {}
+_SITEMAP_DISCOVERY_TTL = 300
 
 
 def _discover_sitemaps(domain):
-    """Find sitemap URLs for a domain. Tries robots.txt first, then common
-    default paths. When robots.txt points at a sibling subdomain (multisite
-    misconfiguration) we surface a warning AND also probe the analysed
-    domain's own paths so the diff isn't comparing the crawl against the
-    wrong site's URL set.
+    """Find sitemap URLs for a domain. Tries robots.txt first (authoritative),
+    then common default paths on the analysed domain itself.
+
+    /sitemap.xml is probed even when robots.txt declared a sitemap: robots.txt
+    sometimes points at a sibling subdomain's sitemap (multisite
+    misconfiguration), and then the analysed domain's own sitemap must be
+    found too, or the crawl is diffed against the wrong site's URL set.
     """
+    import time as _time
     found = []
     seen = set()
     warnings = []
@@ -2883,47 +2903,91 @@ def _discover_sitemaps(domain):
 
     analysed_host = (urlparse(domain).netloc or '').lower()
 
-    try:
-        r = _http_get(f"{domain.rstrip('/')}/robots.txt", timeout=10,
-                         headers={'User-Agent': 'Mozilla/5.0'})
-        if r.ok and r.text:
-            for line in r.text.splitlines():
-                line = line.strip()
-                if line.lower().startswith('sitemap:'):
-                    sm_url = line.split(':', 1)[1].strip()
-                    sm_host = (urlparse(sm_url).netloc or '').lower()
-                    src = 'robots.txt'
-                    if sm_host and analysed_host and sm_host != analysed_host:
-                        src = 'robots.txt (DIFFERENT DOMAIN)'
-                        warnings.append(
-                            f"robots.txt declares sitemap on a different host ({sm_host}) "
-                            f"than the site being analysed ({analysed_host}). "
-                            f"Likely multisite misconfiguration — also probing default paths."
-                        )
-                    _add(sm_url, src)
-    except Exception:
-        pass
+    # A crawl that just finished has often pushed the host into a brief rate
+    # limit. Reuse a discovery from the last few minutes instead of probing
+    # the same host again straight away.
+    cached = _SITEMAP_DISCOVERY_CACHE.get(analysed_host)
+    if cached and (_time.time() - cached[0]) < _SITEMAP_DISCOVERY_TTL:
+        for entry in cached[1]:
+            _add(entry['url'], entry['source'] + ' (cached)')
+        return found, warnings
 
+    # 1. robots.txt: Sitemap: lines are the most reliable signal. One retry
+    # after a short wait on a rate limit or server error, which is what a
+    # host often answers right after the crawl burst.
+    robots_url = f"{domain.rstrip('/')}/robots.txt"
+    robots_text = ''
+    robots_status = None
+    robots_error = None
+    for attempt in range(2):
+        try:
+            r = _http_get(robots_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            robots_status = r.status_code
+            if r.ok and r.text:
+                robots_text = r.text
+                break
+            if r.status_code in (429, 500, 502, 503, 504) and attempt == 0:
+                _time.sleep(4)
+                continue
+            break
+        except Exception as e:
+            robots_error = str(e)[:120]
+            if attempt == 0:
+                _time.sleep(4)
+                continue
+            break
+    if robots_text:
+        for line in robots_text.splitlines():
+            line = line.strip()
+            if line.lower().startswith('sitemap:'):
+                sm_url = line.split(':', 1)[1].strip()
+                sm_host = (urlparse(sm_url).netloc or '').lower()
+                src = 'robots.txt'
+                if sm_host and analysed_host and sm_host != analysed_host:
+                    src = 'robots.txt (DIFFERENT DOMAIN)'
+                    warnings.append(
+                        f"robots.txt declares sitemap on a different host ({sm_host}) "
+                        f"than the site being analysed ({analysed_host}). "
+                        f"Likely multisite misconfiguration, so default paths were probed too."
+                    )
+                _add(sm_url, src)
+    elif robots_status and robots_status >= 400:
+        warnings.append(
+            f"robots.txt returned HTTP {robots_status}, so sitemap discovery may be "
+            f"incomplete. If a crawl just finished, the host may be rate limiting: "
+            f"wait a moment and analyse again."
+        )
+    elif robots_error:
+        warnings.append(f"Could not fetch robots.txt: {robots_error}")
+
+    # 2. Default paths. /sitemap.xml is always probed: it is the usual front
+    # door and often redirects to whatever robots.txt declared. The rest of
+    # the list is only tried when no sitemap on this host turned up yet. The
+    # final URL after redirects is what gets recorded, so /sitemap.xml that
+    # redirects to /sitemap_index.xml dedupes against the declared one.
     has_onsite = any((urlparse(s['url']).netloc or '').lower() == analysed_host for s in found)
-    if not has_onsite:
-        for path in _SITEMAP_DEFAULT_PATHS:
-            url = f"{domain.rstrip('/')}{path}"
-            try:
-                resp = _http_head(url, timeout=8, allow_redirects=True,
-                                     headers={'User-Agent': 'Mozilla/5.0'})
-                if resp.status_code == 405:
-                    resp = _http_get(url, timeout=10, allow_redirects=True,
-                                        headers={'User-Agent': 'Mozilla/5.0'},
-                                        stream=True)
-                    resp.close()
-                if resp.ok:
-                    ct = (resp.headers.get('content-type') or '').lower()
-                    if 'xml' in ct or path.endswith('.xml') or path.endswith('.gz'):
-                        _add(url, 'default-path')
-                        break
-            except Exception:
-                pass
+    paths_to_probe = ['/sitemap.xml'] if has_onsite else list(_SITEMAP_DEFAULT_PATHS)
+    for path in paths_to_probe:
+        url = f"{domain.rstrip('/')}{path}"
+        try:
+            resp = _http_head(url, timeout=8, allow_redirects=True,
+                              headers={'User-Agent': 'Mozilla/5.0'})
+            if resp.status_code == 405:
+                resp = _http_get(url, timeout=10, allow_redirects=True,
+                                 headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
+                resp.close()
+            if resp.ok:
+                final_url = resp.url or url
+                ct = (resp.headers.get('content-type') or '').lower()
+                if 'xml' in ct or path.endswith('.xml') or path.endswith('.gz'):
+                    _add(final_url, 'default-path')
+                    if not has_onsite:
+                        break  # one default is enough on the full fallback
+        except Exception:
+            pass
 
+    if found:
+        _SITEMAP_DISCOVERY_CACHE[analysed_host] = (_time.time(), [dict(e) for e in found])
     return found, warnings
 
 
@@ -3825,6 +3889,7 @@ def crawl_site():
         host_lock = threading.Lock()
         host_backoff = {}      # host → multiplier for adaptive slow-down on 429/403/503
         host_pause_until = {}  # host → epoch-seconds to halt ALL workers for this host
+        url_retry_count = {}   # url → times requeued after a 429 that outlasted its retries
 
         def _wait_host_turn(u):
             # Reads crawl_delay live from ACTIVE_CRAWL_RULES so the slider in
@@ -3961,14 +4026,28 @@ def crawl_site():
                             # WAF block — surface it immediately, regardless of streak count.
                             # 5-min pause is already applied via _adjust_host_backoff.
                             _pause = max(0, host_pause_until.get(_up(url).netloc, 0) - time.time())
-                            yield f"data: {json.dumps({'type': 'speed_adjusted', 'reason': f'{_waf_kind.title()} blocked us — host paused {int(_pause)}s, backoff escalated'})}\n\n"
+                            yield f"data: {json.dumps({'type': 'speed_adjusted', 'reason': f'{_waf_kind.title()} blocked the crawler. Host paused {int(_pause)}s and slowed down.'})}\n\n"
                         if status in (429, 503, 403) or status == 0 or page_data.get('error'):
                             consecutive_errors += 1
                             if consecutive_errors in (3, 6, 12):
-                                _reason_code = status if status else 'conn'
-                                yield f"data: {json.dumps({'type': 'speed_adjusted', 'reason': f'HTTP {_reason_code} — per-host back-off active'})}\n\n"
+                                _reason_code = status if status else 'connection errors'
+                                yield f"data: {json.dumps({'type': 'speed_adjusted', 'reason': f'HTTP {_reason_code}: slowing down for this host'})}\n\n"
                         else:
                             consecutive_errors = max(0, consecutive_errors - 1)
+
+                        # Rate limited past every retry: put the URL back (at most
+                        # 3 tries in all) instead of recording a 429 row. The host
+                        # is now paused and slowed, so the retry goes out after
+                        # the server has had time to recover. The URL stays in
+                        # `visited`, so pages linking to it do not queue copies.
+                        if page_data.get('_rate_limited'):
+                            tries = url_retry_count.get(url, 0) + 1
+                            url_retry_count[url] = tries
+                            if tries < 3:
+                                queue.append((url, depth))
+                                _pause = max(0, host_pause_until.get(_up(url).netloc, 0) - time.time())
+                                yield f"data: {json.dumps({'type': 'speed_adjusted', 'reason': f'HTTP 429: host paused {int(_pause)}s, page queued again (try {tries + 1} of 3)'})}\n\n"
+                                continue
 
                         link_urls = page_data.get('internal_link_urls', [])
 

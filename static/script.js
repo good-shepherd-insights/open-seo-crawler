@@ -919,6 +919,11 @@ function startCrawl(opts) {
               // install progress, renderer failures). Used to be dropped,
               // which hid a failed Render JS behind a one-page crawl.
               showToast(p.msg || '', p.type === 'warning' ? 'warn' : 'info');
+            } else if (p.type === 'speed_adjusted') {
+              // The server slowed down or paused a host (429, 5xx burst, WAF
+              // block). Without this the crawl just seemed to stall.
+              const delayNote = typeof p.delay === 'number' ? `Crawl speed adjusted to ${p.delay.toFixed(1)}s: ` : '';
+              showToast(`${delayNote}${p.reason || 'Per-host back-off active'}`, 'info');
             } else if (p.type === 'cms_detected') {
               // CMS-recommendations banner removed — see live robots.txt
               // preview in the URL filters panel instead.
@@ -4868,7 +4873,7 @@ function saveCurrentCrawl() {
   fetch('/crawl/save', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ name, results: crawlerResults, inlinks: crawlerInlinks })
+    body: JSON.stringify({ name, results: crawlerResults, inlinks: crawlerInlinks, reports: window.crawlerReports || {} })
   }).then(r => r.json()).then(d => {
     if (d.error) { showToast('Save failed: ' + d.error, 'error'); return; }
     showToast(`Saved "${d.name}"`, 'success');
@@ -5431,7 +5436,7 @@ window._compareToggleIssueDrill = function(idx) {
       fetch('/crawl/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, results: crawlerResults, inlinks: crawlerInlinks })
+        body: JSON.stringify({ name, results: crawlerResults, inlinks: crawlerInlinks, reports: window.crawlerReports || {} })
       }).then(r => r.json()).then(d => {
         if (d && d.ok) showToast(`Auto-saved: ${name}`, 'success');
       }).catch(() => {});
