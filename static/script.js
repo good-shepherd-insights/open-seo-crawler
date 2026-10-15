@@ -202,17 +202,30 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// A value passed as a string argument in an inline handler, e.g.
+// onclick="openDock(${jsArg(url)})". JSON.stringify makes a valid JS string
+// literal whatever the value holds (quotes, backslashes, entities) and the
+// HTML escape stops it closing the attribute; the browser decodes the
+// entities before the handler runs, so the function gets the exact value.
+// Crawled sites control URLs, titles and schema types, so every such value
+// goes through here.
+function jsArg(v) {
+  return escapeHtml(JSON.stringify(String(v == null ? '' : v)));
+}
+// href for a crawled URL: http(s) only, escaped for the attribute.
+function safeHref(u) {
+  const s = String(u == null ? '' : u).trim();
+  return /^https?:\/\//i.test(s) ? escapeHtml(s) : '#';
+}
+
 function _scCopyIcon(url) {
-  const sq = (url||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
-  return `<button type="button" onclick="copyUrl(this,'${sq}')" title="Copy URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
+  return `<button type="button" onclick="copyUrl(this,${jsArg(url || '')})" title="Copy URL" aria-label="Copy URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 }
 function _scOpenIcon(url) {
-  const sh = (url||'').replace(/"/g,'&quot;');
-  return `${_scCopyIcon(url)}<a href="${sh}" target="_blank" rel="noopener" title="Open in new tab" style="display:inline-block;color:var(--text-muted,#94a3b8);text-decoration:none;padding:3px 5px;vertical-align:middle;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+  return `${_scCopyIcon(url)}<a href="${safeHref(url)}" target="_blank" rel="noopener" title="Open in new tab" aria-label="Open in new tab" style="display:inline-block;color:var(--text-muted,#94a3b8);text-decoration:none;padding:3px 5px;vertical-align:middle;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
 }
 function _scRefetchIcon(url) {
-  const sq = (url||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
-  return `<button type="button" onclick="scRecrawlUrl(this,'${sq}')" title="Re-crawl this URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.97"/></svg></button>`;
+  return `<button type="button" onclick="scRecrawlUrl(this,${jsArg(url || '')})" title="Re-crawl this URL" aria-label="Re-crawl this URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.97"/></svg></button>`;
 }
 
 // One-time delegated click on the crawler tbody — clicking anywhere on a
@@ -246,11 +259,10 @@ function renderRow(d) {
   const displayUrl = (d.original_url && d.original_url !== d.url) ? d.original_url : d.url;
   const path = displayUrl.replace(/^https?:\/\/[^\/]+/, '') || '/';
   const issues = (d.issues || []).map(i => `<span class="badge ${sevOf(i)}" title="${sevOf(i).toUpperCase()}">${escapeHtml(i)}</span>`).join('');
-  const safe = d.url.replace(/"/g, '&quot;').replace(/'/g, "\\'");
   tr.innerHTML = `
     <td data-col="url" title="${escapeHtml(displayUrl)}">
       <span style="display:flex;align-items:center;gap:2px;min-width:0;">
-        <span class="url-cell" onclick="openDock('${safe}')" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(path)}</span>
+        <span class="url-cell" onclick="openDock(${jsArg(d.url)})" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(path)}</span>
         <span class="cs-cell-actions" style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;">${_scOpenIcon(d.url)}${_scRefetchIcon(d.url)}</span>
       </span>
     </td>
@@ -469,7 +481,8 @@ function _scEscapeHtml(s) {
   if (typeof s !== 'string') {
     try { s = Array.isArray(s) ? s.join(', ') : String(s); } catch { return ''; }
   }
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Quotes too: this escaper also fills title="" and data-*="" attributes.
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function _scGridColgroup(cols) {
   return `<colgroup>${cols.map(c => c.width ? `<col style="width:${c.width}px">` : '<col>').join('')}</colgroup>`;
@@ -687,7 +700,7 @@ function renderDock() {
         const p = src.replace(/^https?:\/\/[^\/]+/, '') || '/';
         return `<div class="link-row">
           <a href="${escapeHtml(src)}" target="_blank" rel="noopener">${escapeHtml(p)}</a>
-          <button class="copy-icon" onclick="copyUrl(this,'${src.replace(/'/g,"\\'")}')">⧉</button>
+          <button class="copy-icon" onclick="copyUrl(this,${jsArg(src)})" title="Copy URL" aria-label="Copy URL">⧉</button>
           ${anchor ? `<span class="anchor">"${escapeHtml(anchor.slice(0,60))}${anchor.length > 60 ? '…' : ''}"</span>` : ''}
           ${placement ? `<span class="placement">${escapeHtml(placement)}</span>` : ''}
         </div>`;
@@ -702,7 +715,7 @@ function renderDock() {
         const p = target.replace(/^https?:\/\/[^\/]+/, '') || '/';
         return `<div class="link-row">
           <a href="${escapeHtml(target)}" target="_blank" rel="noopener">${escapeHtml(p)}</a>
-          <button class="copy-icon" onclick="copyUrl(this,'${target.replace(/'/g,"\\'")}')">⧉</button>
+          <button class="copy-icon" onclick="copyUrl(this,${jsArg(target)})" title="Copy URL" aria-label="Copy URL">⧉</button>
           ${anchor ? `<span class="anchor">"${escapeHtml(anchor.slice(0,60))}${anchor.length > 60 ? '…' : ''}"</span>` : ''}
         </div>`;
       }).join('')
@@ -1121,8 +1134,8 @@ function crawlerUpdateQueuePanel(sample, totalCount) {
   for (const url of list) {
     const safe = escapeHtml(url);
     html += `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;">
-      <button onclick="crawlerExcludeFromQueue('${safe.replace(/'/g, "\\'")}')" title="Exclude this URL from the rest of the crawl" style="flex-shrink:0;background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;line-height:1;padding:0 4px;font-weight:700;">✕</button>
-      <span style="color:#0f172a;word-break:break-all;">${safe}</span>
+      <button onclick="crawlerExcludeFromQueue(${jsArg(url)})" title="Exclude this URL from the rest of the crawl" aria-label="Exclude this URL from the rest of the crawl" style="flex-shrink:0;background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;line-height:1;padding:0 4px;font-weight:700;">✕</button>
+      <span style="color:var(--text);word-break:break-all;">${safe}</span>
     </div>`;
   }
   if (truncated) {
@@ -1829,11 +1842,11 @@ function _scRenderImagesMissingAltPanel() {
                   : `<span style="color:var(--text);">${escapeHtml(alt)}</span>`);
 
   const rows = groups.map(rec => {
-    const safeSrc = (rec.src || '').replace(/"/g, '&quot;');
+    const safeSrc = escapeHtml(rec.src || '');
     const fname = (rec.src || '').split('/').pop().split('?')[0] || rec.src;
     const inlinks = rec.pages.map(pg =>
       `<div style="display:flex;gap:8px;padding:2px 0;font-size:.72rem;">
-        <a href="${(pg.url || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;word-break:break-all;flex:0 0 auto;max-width:50%;" title="${(pg.url || '').replace(/"/g, '&quot;')}">${escapeHtml(pathOf(pg.url) || '/')}</a>
+        <a href="${safeHref(pg.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;word-break:break-all;flex:0 0 auto;max-width:50%;" title="${escapeHtml(pg.url || '')}">${escapeHtml(pathOf(pg.url) || '/')}</a>
         <span style="color:var(--text-muted);flex:1;min-width:0;">alt: ${altCell(pg.alt)}</span>
       </div>`).join('');
     return `
@@ -2845,7 +2858,7 @@ function _scRenderSummaryPanel() {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;">
           ${rows.map(r => `
-            <div onclick="selectCategory('${r.slug.replace(/'/g, "\\'")}')"
+            <div onclick="selectCategory(${jsArg(r.slug)})"
                  style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
                  onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
                  onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
@@ -2998,7 +3011,7 @@ function _scRenderSeverityPanel(cat) {
   const cardsHtml = rows.length ? `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:18px;">
       ${rows.map(r => `
-        <div onclick="selectCategory('${r.slug.replace(/'/g, "\\'")}')"
+        <div onclick="selectCategory(${jsArg(r.slug)})"
              style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
              onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
              onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
@@ -3130,7 +3143,7 @@ function _scRenderHreflangPanel() {
                   const bad = !validCode.test(e.lang || '');
                   return `<tr>
                     <td style="padding:4px 12px;border-top:1px solid var(--border);font-family:'SF Mono','Menlo',monospace;width:120px;${bad?'color:#ef4444;font-weight:700;':''}">${lang}</td>
-                    <td style="padding:4px 12px;border-top:1px solid var(--border);"><a href="${href}" target="_blank" style="color:var(--accent);">${href}</a></td>
+                    <td style="padding:4px 12px;border-top:1px solid var(--border);"><a href="${safeHref(e.href || '')}" target="_blank" rel="noopener" style="color:var(--accent);">${href}</a></td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -3172,7 +3185,7 @@ function _renderSchemaByPagePanel() {
   const escapeHtml = _scEscapeHtml;
   // Clickable chips — toggle the type in window._scSchemaPageFilter.types
   const typeChip = (t, n) =>
-    `<button type="button" class="sc-schema-chip" data-schema-chip="${escapeHtml(t)}" onclick="_scSchemaPageToggleChip('${(t || '').replace(/'/g, "\\'")}')" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;font-size:11px;cursor:pointer;font-family:inherit;">
+    `<button type="button" class="sc-schema-chip" data-schema-chip="${escapeHtml(t)}" onclick="_scSchemaPageToggleChip(${jsArg(t || '')})" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;font-size:11px;cursor:pointer;font-family:inherit;">
        <code style="font-size:10.5px;font-weight:600;color:var(--text);">${escapeHtml(t)}</code>
        <span style="color:var(--text-muted);">×${n}</span>
      </button>`;
@@ -3201,7 +3214,7 @@ function _renderSchemaByPagePanel() {
       ? types.map(t => `<code style="display:inline-block;font-size:10.5px;background:var(--surface2);color:var(--text);padding:2px 7px;border-radius:4px;margin:1px;border:1px solid var(--border);">${escapeHtml(t)}</code>`).join(' ')
       : '<span style="color:#f59e0b;font-style:italic;font-size:11px;">no schema</span>';
     return `<tr data-types="${escapeHtml(types.join('|'))}" data-url-lower="${escapeHtml((r.url || '').toLowerCase())}">
-      <td title="${escapeHtml(r.url)}"><a href="${r.url}" target="_blank" style="color:#4f46e5;">${escapeHtml(path)}</a></td>
+      <td title="${escapeHtml(r.url)}"><a href="${safeHref(r.url)}" target="_blank" rel="noopener" style="color:var(--accent);">${escapeHtml(path)}</a></td>
       <td>${cells}</td>
     </tr>`;
   }).join('');
@@ -3355,8 +3368,6 @@ function _renderNearDupPanel() {
   }
   const tPct = Math.round((stats.threshold || 0.9) * 100);
   const rowsHtml = pairs.map(p => {
-    const safeA = (p.url_a || '').replace(/'/g, "\\'");
-    const safeB = (p.url_b || '').replace(/'/g, "\\'");
     const sim = Math.round((p.similarity || 0) * 100);
     const simColor = sim >= 95 ? '#dc2626' : sim >= 90 ? '#ea580c' : sim >= 85 ? '#d97706' : '#65a30d';
     const pathA = (p.url_a || '').replace(/^https?:\/\/[^\/]+/, '') || '/';
@@ -3364,10 +3375,10 @@ function _renderNearDupPanel() {
     const sample = p.shared_phrase_sample || '—';
     return `<tr>
       <td style="font-variant-numeric:tabular-nums;font-weight:700;color:${simColor};">${sim}%</td>
-      <td title="${_scEscapeHtml(p.url_a)}"><a href="${p.url_a}" target="_blank" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathA)}</a></td>
-      <td title="${_scEscapeHtml(p.url_b)}"><a href="${p.url_b}" target="_blank" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathB)}</a></td>
+      <td title="${_scEscapeHtml(p.url_a)}"><a href="${safeHref(p.url_a)}" target="_blank" rel="noopener" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathA)}</a></td>
+      <td title="${_scEscapeHtml(p.url_b)}"><a href="${safeHref(p.url_b)}" target="_blank" rel="noopener" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathB)}</a></td>
       <td style="color:var(--text-muted,#64748b);font-family:monospace;font-size:.7rem;" title="${_scEscapeHtml(sample)}">${_scEscapeHtml(sample)}</td>
-      <td style="text-align:right;"><button type="button" onclick="openNdDiff('${safeA}','${safeB}')" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--accent,#6366f1);cursor:pointer;">Compare →</button></td>
+      <td style="text-align:right;"><button type="button" onclick="openNdDiff(${jsArg(p.url_a || '')},${jsArg(p.url_b || '')})" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--accent,#6366f1);cursor:pointer;">Compare →</button></td>
     </tr>`;
   }).join('');
   panel.innerHTML = `
@@ -3418,7 +3429,7 @@ window.openNdDiff = function(urlA, urlB) {
   const shared = new Set([...sa].filter(s => sb.has(s)));
   const sharedTokens = new Set();
   shared.forEach(g => g.split(' ').forEach(t => sharedTokens.add(t)));
-  const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const renderBody = (text) => {
     if (!text) return '<em style="color:var(--text-muted,#64748b);">(no body text captured)</em>';
     const sentences = text.split(/(?<=[.!?])\s+/);
@@ -3479,9 +3490,9 @@ function _renderSitemapPanel(cat) {
   };
   const info = map[cat] || { key: '', hint: '' };
   const items = reports[info.key] || [];
-  const sources = (d.sitemaps_found || []).map(s => `<a href="${s.url}" target="_blank" style="color:#4f46e5;">${s.url}</a> <span style="color:#64748b;">(${s.source})</span>`).join(' · ');
+  const sources = (d.sitemaps_found || []).map(s => `<a href="${safeHref(s.url)}" target="_blank" rel="noopener" style="color:var(--accent);">${escapeHtml(s.url)}</a> <span style="color:var(--text-muted);">(${escapeHtml(s.source)})</span>`).join(' · ');
   const totals = d.totals || {};
-  const warns = (d.warnings || []).map(w => `<div style="font-size:11px;color:#d97706;padding:4px 0;">⚠ ${w}</div>`).join('');
+  const warns = (d.warnings || []).map(w => `<div style="font-size:11px;color:#d97706;padding:4px 0;">⚠ ${escapeHtml(w)}</div>`).join('');
   const header = `
     <div style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:11px;">
       <div><b>Sitemap(s):</b> ${sources || '(none)'}</div>
@@ -3510,7 +3521,7 @@ function _renderSitemapPanel(cat) {
   const hasMeta = rows.some(r => r.meta);
   const rowHtml = rows.map(r => `
     <tr data-url="${_scEscapeHtml(r.url)}">
-      <td title="${_scEscapeHtml(r.url)}"><a href="${r.url}" target="_blank" style="color:#4f46e5;">${_scEscapeHtml(r.url)}</a></td>
+      <td title="${_scEscapeHtml(r.url)}"><a href="${safeHref(r.url)}" target="_blank" rel="noopener" style="color:var(--accent);">${_scEscapeHtml(r.url)}</a></td>
       ${hasMeta ? `<td style="color:#94a3b8;" title="${_scEscapeHtml(r.meta)}">${_scEscapeHtml(r.meta)}</td>` : ''}
     </tr>
   `).join('');
@@ -4922,27 +4933,27 @@ function openCrawlLoader(opts) {
       const seed = (c.seed || '').replace(/^https?:\/\//,'').replace(/\/$/,'');
       const savedBy = (c.saved_by || 'unknown');
       const compareBtn = hasCurrent
-        ? `<button onclick='compareWithCurrent(${JSON.stringify(c.file)}, ${JSON.stringify(c.name)})' style="padding:6px 12px;font-size:11px;background:${compareOnly ? '#6366f1' : 'transparent'};color:${compareOnly ? '#fff' : '#6366f1'};border:1px solid #6366f1;border-radius:4px;cursor:pointer;font-weight:${compareOnly ? '600' : '400'};">Compare</button>`
+        ? `<button onclick="compareWithCurrent(${jsArg(c.file)}, ${jsArg(c.name || '')})" style="padding:6px 12px;font-size:11px;background:${compareOnly ? '#6366f1' : 'transparent'};color:${compareOnly ? '#fff' : '#6366f1'};border:1px solid #6366f1;border-radius:4px;cursor:pointer;font-weight:${compareOnly ? '600' : '400'};">Compare</button>`
         : '';
       const loadBtn = compareOnly
         ? ''
-        : `<button onclick='loadSavedCrawl(${JSON.stringify(c.file)})' style="padding:6px 10px;font-size:11px;background:#6366f1;color:#fff;border:0;border-radius:4px;cursor:pointer;">Load</button>`;
+        : `<button onclick="loadSavedCrawl(${jsArg(c.file)})" style="padding:6px 10px;font-size:11px;background:#6366f1;color:#fff;border:0;border-radius:4px;cursor:pointer;">Load</button>`;
       const delBtn = compareOnly
         ? ''
-        : `<button onclick='deleteSavedCrawl(${JSON.stringify(c.file)})' title="Delete" style="padding:6px 8px;font-size:11px;background:transparent;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;">✕</button>`;
-      const searchBlob = (`${seed} ${c.name || ''} ${savedBy}`).toLowerCase().replace(/"/g,'&quot;');
+        : `<button onclick="deleteSavedCrawl(${jsArg(c.file)})" title="Delete" aria-label="Delete saved crawl" style="padding:6px 8px;font-size:11px;background:transparent;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;">✕</button>`;
+      const searchBlob = (`${seed} ${c.name || ''} ${savedBy}`).toLowerCase();
       return `
-        <div data-crawl-row="${c.file}" data-search="${searchBlob}" style="display:grid;grid-template-columns:95px 55px 1fr 100px 80px 200px;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">
+        <div data-crawl-row="${escapeHtml(c.file)}" data-search="${escapeHtml(searchBlob)}" style="display:grid;grid-template-columns:95px 55px 1fr 100px 80px 200px;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;">
           <div style="color:#0f172a;font-variant-numeric:tabular-nums;">${dateStr}</div>
           <div style="color:#64748b;font-variant-numeric:tabular-nums;font-family:'SF Mono','Menlo',monospace;">${timeStr}</div>
           <div style="min-width:0;">
-            <div style="font-weight:600;color:#0f172a;word-break:break-all;">${seed || c.name}
-              ${c.source && c.source !== 'site-crawler' ? '<span title="Saved by another local tool" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#ede9fe;color:#5b21b6;border-radius:3px;font-size:9.5px;font-weight:600;vertical-align:middle;">' + c.source + '</span>' : ''}
+            <div style="font-weight:600;color:#0f172a;word-break:break-all;">${escapeHtml(seed || c.name)}
+              ${c.source && c.source !== 'site-crawler' ? '<span title="Saved by another local tool" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#ede9fe;color:#5b21b6;border-radius:3px;font-size:9.5px;font-weight:600;vertical-align:middle;">' + escapeHtml(c.source) + '</span>' : ''}
               ${c.source === 'site-crawler' ? '<span title="Saved in site-crawler" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dbeafe;color:#1e40af;border-radius:3px;font-size:9.5px;font-weight:600;vertical-align:middle;">site-crawler</span>' : ''}
             </div>
-            <div style="font-size:10px;color:#64748b;word-break:break-all;">${c.name}</div>
+            <div style="font-size:10px;color:#64748b;word-break:break-all;">${escapeHtml(c.name)}</div>
           </div>
-          <div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${savedBy}">${savedBy}</div>
+          <div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(savedBy)}">${escapeHtml(savedBy)}</div>
           <div style="text-align:right;color:#0f172a;font-variant-numeric:tabular-nums;">${c.pages}</div>
           <div style="display:flex;gap:6px;justify-content:flex-end;">
             ${compareBtn}
@@ -5095,7 +5106,7 @@ function _renderCompareModal(d, savedName) {
   }
   const title = document.getElementById('crawl-compare-title');
   if (title) title.textContent = `Compare: "${savedName || (d.a && d.a.name) || ''}" (old) vs current crawl`;
-  const escHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const delta = (a, b, opts = {}) => {
     const dlt = b - a;
@@ -5235,7 +5246,7 @@ function _renderCompareModal(d, savedName) {
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:'SF Mono','Menlo',monospace;">
         <span style="color:${signColor};font-weight:700;">${sign}</span>
         ${sc}
-        <a href="${x.url}" target="_blank" style="color:#6366f1;text-decoration:none;word-break:break-all;flex:1;min-width:0;">${escHtml(x.url)}</a>
+        <a href="${safeHref(x.url)}" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;word-break:break-all;flex:1;min-width:0;">${escHtml(x.url)}</a>
       </div>
       ${ti}
     </div>`;
@@ -5264,7 +5275,7 @@ function _renderCompareModal(d, savedName) {
     }).join('');
     return `<div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">
       <div style="font-size:12px;font-family:'SF Mono','Menlo',monospace;word-break:break-all;margin-bottom:4px;">
-        <a href="${c.url}" target="_blank" style="color:#6366f1;text-decoration:none;">${escHtml(c.url)}</a>
+        <a href="${safeHref(c.url)}" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;">${escHtml(c.url)}</a>
       </div>
       ${fields}
     </div>`;
@@ -5375,7 +5386,7 @@ window._compareToggleIssueDrill = function(idx) {
 
   const it = (window._compareData && (window._compareData.issues || [])[idx]) || null;
   if (!it) return;
-  const escHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const renderList = (urls, total, emptyMsg, color) => {
     const safeUrls = Array.isArray(urls) ? urls : [];
     if (!safeUrls.length) return `<div style="padding:10px 12px;color:#64748b;font-size:11px;font-style:italic;">${emptyMsg}</div>`;
@@ -5384,7 +5395,7 @@ window._compareToggleIssueDrill = function(idx) {
       : '';
     return safeUrls.map(u => `
       <div style="padding:5px 12px;font-size:11.5px;font-family:'SF Mono','Menlo',monospace;border-bottom:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <span style="color:${color};font-weight:700;margin-right:6px;">●</span><a href="${u}" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;">${escHtml(u)}</a>
+        <span style="color:${color};font-weight:700;margin-right:6px;">●</span><a href="${safeHref(u)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${escHtml(u)}</a>
       </div>`).join('') + more;
   };
   const onlyA = it.only_a || [];
@@ -5659,7 +5670,6 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
     const angle = arc.a1 - arc.a0;
     const midR = (r0 + r1) / 2;
     const arcLengthMid = midR * angle;
-    const safePath = _scEsc(arc.node.full).replace(/'/g, "\\'");
     const hasKids = Object.keys(arc.node.children || {}).length > 0;
     const title = `${_scEsc(arc.node.full)}\n${arc.node.count} URL${arc.node.count===1?'':'s'}${arc.node.errors?` · ${arc.node.errors} broken`:''}${arc.node.issues?` · ${arc.node.issues} issue${arc.node.issues===1?'':'s'}`:''}\n${hasKids ? 'Click to drill in · Shift+click to filter table' : 'Shift+click to filter table'}`;
 
@@ -5708,9 +5718,9 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
     return `<g class="sv-slice" data-path="${_scEsc(arc.node.full)}">
       <path d="${path}" fill="${color}" stroke="#fff" stroke-width="1.5" opacity="0.92"
         style="cursor:pointer;transition:opacity .12s;"
-        onmouseover="this.setAttribute('opacity','1');_svSliceHover('${safePath}', ${arc.node.count}, ${arc.node.errors}, ${arc.node.issues})"
+        onmouseover="this.setAttribute('opacity','1');_svSliceHover(${jsArg(arc.node.full)}, ${arc.node.count}, ${arc.node.errors}, ${arc.node.issues})"
         onmouseout="this.setAttribute('opacity','0.92');_svSliceHover('','','','')"
-        onclick="_svSliceClick(event, '${safePath}', ${hasKids ? 1 : 0})">
+        onclick="_svSliceClick(event, ${jsArg(arc.node.full)}, ${hasKids ? 1 : 0})">
         <title>${title}</title>
       </path>
       ${label}
@@ -5737,7 +5747,7 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
     }
     return items.map((it, i) => {
       const isLast = i === items.length - 1;
-      return `<button type="button" onclick="_svZoomTo('${it.path.replace(/'/g,"\\'")}')"
+      return `<button type="button" onclick="_svZoomTo(${jsArg(it.path)})"
         style="background:${isLast?'#6366f1':'#fff'};color:${isLast?'#fff':'#0f172a'};border:1px solid ${isLast?'#6366f1':'#e2e8f0'};border-radius:5px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;">${_scEsc(it.name)}</button>`;
     }).join('<span style="color:#94a3b8;font-size:11px;align-self:center;">›</span>');
   };
@@ -5834,8 +5844,7 @@ function _svRenderList(pages, filter) {
     const title = p.title || p.t || '';
     const path = url.replace(/^https?:\/\/[^\/]+/, '') || '/';
     const sc = status >= 500 ? '#dc2626' : status >= 400 ? '#ef4444' : status >= 300 ? '#f59e0b' : status >= 200 ? '#22c55e' : '#94a3b8';
-    const safeUrl = (url || '').replace(/'/g, "\\'");
-    return `<div onclick="_svListClick(event, '${safeUrl}')"
+    return `<div onclick="_svListClick(event, ${jsArg(url)})"
       style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid #e2e8f0;cursor:pointer;line-height:1.4;"
       onmouseover="this.style.background='#fff'" onmouseout="this.style.background=''"
       title="${_scEsc(title || url)}">
