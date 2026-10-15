@@ -20,6 +20,7 @@ import requests
 import json
 import os
 import re as _re
+import sys
 import time
 import logging
 import queue
@@ -675,7 +676,20 @@ def update_self():
 
     before = _local_commit_sha()
     before_req = _req_hash()
+
     try:
+        # The hard-reset fallback below must never eat real work. An install has
+        # no commits of its own and, off Windows, no edited tracked files. A
+        # developer checkout running this same app can have both, and reset
+        # --hard would destroy them. Counted before the fetch moves origin/master,
+        # so commits that only vanished upstream (a history rewrite) still reset.
+        ahead_out = _git('rev-list', '--count', 'origin/master..HEAD')
+        ahead = int(ahead_out.stdout.strip() or 0) if ahead_out.returncode == 0 else 0
+        dirty = ''
+        if os.name != 'nt':   # a CRLF checkout on Windows reports every file as edited
+            st = _git('status', '--porcelain', '--untracked-files=no')
+            dirty = st.stdout.strip() if st.returncode == 0 else ''
+
         fetch = _git('fetch', '--quiet', 'origin', 'master')
         if fetch.returncode != 0:
             return jsonify({'ok': False, 'error': ('git fetch failed: ' + (fetch.stderr or fetch.stdout).strip())[:400]}), 500
@@ -685,6 +699,15 @@ def update_self():
         # case). Either way the tree ends up exactly on origin/master.
         ff = _git('merge', '--ff-only', 'origin/master')
         if ff.returncode != 0:
+            if ahead or dirty:
+                held = []
+                if ahead:
+                    held.append(f'{ahead} commit(s) that are not on GitHub')
+                if dirty:
+                    held.append('edited files that are not committed')
+                return jsonify({'ok': False, 'error': (
+                    'Update stopped so nothing is lost: this checkout has '
+                    + ' and '.join(held) + '. Commit or push that work, then update again.')}), 409
             reset = _git('reset', '--hard', 'origin/master')
             if reset.returncode != 0:
                 return jsonify({'ok': False, 'error': ('git reset failed: ' + (reset.stderr or reset.stdout).strip())[:400]}), 500
@@ -718,6 +741,8 @@ def update_self():
             'changed': after != _BOOT_SHA,
             'pulled': before != after,
             'message': msg[:400],
+            # Lets the UI name the right restart command if the app stays down.
+            'platform': sys.platform,
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)[:300]}), 500
@@ -725,9 +750,10 @@ def update_self():
 
 @app.route('/restart', methods=['POST'])
 def restart_self():
-    """Detached restart of the running Flask process. Platform split:
-    POSIX uses bash + nohup; Windows uses cmd.exe + start to launch a
-    detached pythonw.exe so the new process survives this one's death."""
+    """Restart the running Flask process onto the code on disk. Platform
+    split: POSIX re-execs in place (same PID, so systemd and launchd never
+    see a stop); Windows hands off to a detached PowerShell helper that
+    kills this process and starts a fresh pythonw.exe."""
     import subprocess as _sp
     import sys as _sys
     repo = os.path.dirname(os.path.abspath(__file__))
@@ -786,18 +812,36 @@ def restart_self():
             return jsonify({'ok': False, 'error': str(last_err)[:300]}), 500
         return jsonify({'ok': True, 'message': 'Restarting in ~3s'})
 
-    # POSIX
-    log_path = os.path.expanduser('~/site-crawler/.restart.log')
-    cmd = (
-        f"sleep 1 && "
-        f"kill {own_pid} 2>/dev/null; sleep 1; "
-        f"cd {repo} && nohup python3 app.py >/dev/null 2>&1 &"
-    )
-    try:
-        _sp.Popen(['bash', '-c', cmd], start_new_session=True,
-                  stdout=open(log_path, 'a'), stderr=_sp.STDOUT)
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)[:300]}), 500
+    # POSIX: replace this process with a fresh copy of itself, same PID.
+    # Killing ourselves and respawning does not survive a service manager.
+    # systemd reads a SIGTERM exit as a clean stop, so Restart=on-failure
+    # (what install.sh writes) never brings the app back, and stopping the
+    # unit kills its whole cgroup, the detached respawn helper included.
+    # The app just vanished after "Restarting...". exec keeps the PID, so
+    # systemd and launchd see nothing happen, and a plain `python3 app.py`
+    # in a terminal restarts the same way.
+    def _reexec():
+        for stream in (_sys.stdout, _sys.stderr):
+            try:
+                stream.flush()
+            except Exception:
+                pass
+        # Werkzeug marks its listening socket inheritable and records it in
+        # WERKZEUG_SERVER_FD for its reloader. Left that way, the socket rides
+        # through exec, the new process cannot bind the port, and it exits.
+        fd = os.environ.pop('WERKZEUG_SERVER_FD', '')
+        if fd.isdigit():
+            try:
+                os.set_inheritable(int(fd), False)
+            except OSError:
+                pass
+        try:
+            os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+        except Exception as e:
+            app.logger.error(f"[restart] exec failed, still running the old build: {e}")
+
+    # A short delay lets this response reach the browser first.
+    threading.Timer(1.0, _reexec).start()
     return jsonify({'ok': True, 'message': 'Restarting in ~2s'})
 
 

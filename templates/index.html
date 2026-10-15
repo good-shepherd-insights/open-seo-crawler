@@ -117,26 +117,30 @@
         }
         window._scBuildLocal = local;
         window._scBuildRemote = remote;
-        if (remote && remote !== local) {
+        // Prefix match: git can print a longer short SHA than GitHub's 7 chars.
+        const sameBuild = (a, b) => !!a && !!b && (a.startsWith(b) || b.startsWith(a));
+        window._scSameBuild = sameBuild;
+        if (remote && !sameBuild(remote, local)) {
           badge.style.color = '#fff';
           badge.style.background = '#f59e0b';
           badge.style.border = '1px solid #f59e0b';
           badge.style.fontWeight = '700';
-          badge.title = `Update available — running ${local}, latest is ${remote}. Click to update.`;
+          badge.title = `Update available: running ${local}, latest is ${remote}. Click to update.`;
           badge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Update now`;
         }
       })();
     });
-    // Click handler — one-click pull + restart + page reload.
-    //   1. POST /update         (git pull --ff-only)
-    //   2. POST /restart        (detached shell kills+respawns the app)
+    // Click handler: one-click pull + restart + page reload.
+    //   1. POST /update         (fast-forward to origin/master)
+    //   2. POST /restart        (POSIX re-execs in place; Windows respawns via a helper)
     //   3. Poll /version until the new SHA shows up, then reload.
-    // If already up to date, just say so — never link out to the source
+    // If already up to date, just say so. Never link out to the source
     // repo (users shouldn't have to leave the app to check for updates).
     async function versionBadgeClick() {
       const local = window._scBuildLocal || '';
       const remote = window._scBuildRemote || '';
-      if (!remote || remote === local || local === 'dev') {
+      const same = window._scSameBuild || ((a, b) => a === b);
+      if (!remote || same(remote, local) || local === 'dev') {
         const badge = document.getElementById('build-version');
         if (badge) {
           const prev = badge.textContent;
@@ -156,7 +160,7 @@
         const r = await fetch('/update', { method: 'POST' });
         const d = await r.json();
         if (!d.ok) { alert('Update failed:\n\n' + d.error); setBadge('Update now', '#f59e0b'); return; }
-        if (!d.changed) { alert('Already up to date.'); setBadge('v ' + local); badge.style.background = ''; badge.style.color = 'var(--text-muted)'; return; }
+        if (!d.changed) { setBadge('Up to date ✓'); badge.style.background = ''; badge.style.color = 'var(--text-muted)'; setTimeout(() => setBadge('v ' + local), 1400); return; }
         setBadge('Restarting…', '#0ea5e9');
         // Fire-and-forget restart; the response may not flush because
         // the server kills itself, so don't await indefinitely.
@@ -179,7 +183,11 @@
             }
           } catch {}
         }
-        alert('The update was pulled, but the app did not come back automatically.\n\nReload this page in a few seconds — it usually finishes restarting. If it stays down, run Run.ps1 in the install folder (or check restart.log).');
+        const how = {
+          win32: 'run Run.ps1 in the install folder',
+          darwin: 'run: launchctl kickstart -k gui/$(id -u)/io.openseocrawler.app',
+        }[d.platform] || 'run: sudo systemctl restart open-seo-crawler';
+        alert('The update was pulled, but the crawler did not come back by itself.\n\nReload this page in a few seconds. If it is still down, restart it: ' + how + '.');
         setBadge('Update now', '#f59e0b');
       } catch (e) {
         alert('Update request failed: ' + e.message);
