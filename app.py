@@ -1364,6 +1364,70 @@ def _filename_looks_decorative(src):
     return bool(_DECORATIVE_FILENAME_RE.search(fname))
 
 
+def _content_text(html):
+    """Main-content text of a page, for word counts and near-duplicate
+    detection: scripts, nav, header, footer, forms and nav-like wrappers
+    removed, then <main>, <article> or a content container preferred over
+    the whole body. Shared by the crawl and by the raw-HTML side of the JS
+    vs non-JS diff, so both sides count words the same way. (The diff used
+    to compare this count against a whole-body count, and flagged plain
+    static pages because their menus and footers inflated the raw side.)
+    """
+    soup_body = BeautifulSoup(html or '', 'html.parser')
+    for tag in soup_body(['script', 'style', 'nav', 'footer', 'header', 'iframe', 'noscript', 'form', 'svg']):
+        tag.decompose()
+    try:
+        nav_like_re = _re.compile(
+            r'(main[-_]?menu|primary[-_]?menu|site[-_]?nav|header[-_]?nav|'
+            r'mega[-_]?menu|nav[-_]?menu|top[-_]?menu|mobile[-_]?menu|sub[-_]?menu|'
+            r'breadcrumb|footer[-_]?menu|site[-_]?header|site[-_]?footer|'
+            r'menu[-_]?wrap|navbar|navigation|'
+            r'elementor-nav-menu|elementor-menu|elementor-widget-nav-menu|'
+            r'et_pb_menu|divi-menu|menu-item-has-children|\bmenu\b|'
+            r'offcanvas|hamburger|dropdown-menu)',
+            _re.I,
+        )
+        role_nav_re = _re.compile(r'^(navigation|menubar|menu)$', _re.I)
+        for el in list(soup_body.find_all(['div', 'section', 'ul', 'aside'])):
+            if not el.parent:
+                continue
+            classes = ' '.join(el.get('class') or [])
+            ident = el.get('id') or ''
+            role = el.get('role') or ''
+            aria = el.get('aria-label') or ''
+            if (nav_like_re.search(classes) or nav_like_re.search(ident)
+                    or role_nav_re.match(role) or nav_like_re.search(aria)):
+                el.decompose()
+    except Exception:
+        pass
+    # Pick the first <article> that ISN'T a post-grid / related-posts card.
+    # Elementor and many blog themes render recent/related posts as
+    # <article class="elementor-post elementor-grid-item ...">; grabbing the
+    # first of those captures the same boilerplate snippet on every page, so
+    # every post looks like an exact body duplicate. Skip those cards.
+    def _real_article(sb):
+        for art in sb.find_all('article'):
+            cls = ' '.join(art.get('class') or [])
+            if _re.search(r'elementor-post|elementor-grid-item|elementor-posts|post-grid|related|recent[-_]?post|widget', cls, _re.I):
+                continue
+            return art
+        return None
+
+    main_container = (
+        soup_body.find('main')
+        or soup_body.find(attrs={'role': 'main'})
+        # Elementor Theme Builder renders the real post body in this widget
+        # and ships no <main>/<article> wrapper, so it must come before the
+        # generic <article> fallback (which would otherwise hit a grid card).
+        or soup_body.find(attrs={'class': _re.compile(r'elementor-widget-theme-post-content', _re.I)})
+        or _real_article(soup_body)
+        or soup_body.find(id=_re.compile(r'^(main|content|primary|page-content)$', _re.I))
+        or soup_body.find(attrs={'class': _re.compile(r'(^|\s)(main-content|page-content|entry-content|post-content|article-content|site-main)(\s|$)', _re.I)})
+    )
+    text_root = main_container if main_container else soup_body
+    return text_root.get_text(separator=' ', strip=True)
+
+
 def _parse_no_js_subset(html, base_url):
     """Parse a subset of SEO-critical fields from raw HTML — used for the
     JS-vs-non-JS comparison so we can show what content is missing when JS
@@ -1392,10 +1456,6 @@ def _parse_no_js_subset(html, base_url):
         h1s = [h for h in h1s if h]
         out['h1'] = h1s[0] if h1s else ''
         out['h1_count'] = len(h1s)
-        for s in soup(['script', 'style', 'noscript']):
-            s.decompose()
-        body_text = ' '.join(soup.get_text(separator=' ', strip=True).split())
-        out['word_count'] = len(body_text.split()) if body_text else 0
         types = []
         def _push(v):
             if isinstance(v, list):
@@ -1418,7 +1478,24 @@ def _parse_no_js_subset(html, base_url):
                             _push(it['@type'])
             except Exception:
                 pass
+        # Microdata too, exactly as the main parser reads it. Without this the
+        # raw HTML of any microdata page looked schema-less next to the
+        # rendered DOM, and the JS diff called the schema "injected by JS"
+        # (critical) on plain static pages.
+        for el in soup.find_all(attrs={'itemtype': True})[:25]:
+            it_type = (el.get('itemtype') or '').rstrip('/').rsplit('/', 1)[-1].strip()
+            if it_type and it_type not in types:
+                types.append(it_type)
         out['schema_types'] = types
+        # Same main-content count as the crawl (the rendered side of the
+        # diff), from the untouched HTML.
+        body_text = _content_text(html)
+        out['word_count'] = len(body_text.split()) if body_text else 0
+        # Link and image counts below expect scripts gone. Stripped only now:
+        # doing it first hid every JSON-LD block, so the diff reported schema
+        # as JS-only on pages that serve it in HTML.
+        for s in soup(['script', 'style', 'noscript']):
+            s.decompose()
         try:
             host = (urlparse(base_url).netloc or '').lower().replace('www.', '')
         except Exception:
@@ -2323,59 +2400,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         # <div class="elementor-nav-menu">). Also prefer <main>/<article>
         # content when present so the body word count reflects actual content,
         # not menu/footer boilerplate (otherwise thin-content detection misfires).
-        soup_body = BeautifulSoup(raw_html, 'html.parser')
-        for tag in soup_body(['script', 'style', 'nav', 'footer', 'header', 'iframe', 'noscript', 'form', 'svg']):
-            tag.decompose()
-        try:
-            nav_like_re = _re.compile(
-                r'(main[-_]?menu|primary[-_]?menu|site[-_]?nav|header[-_]?nav|'
-                r'mega[-_]?menu|nav[-_]?menu|top[-_]?menu|mobile[-_]?menu|sub[-_]?menu|'
-                r'breadcrumb|footer[-_]?menu|site[-_]?header|site[-_]?footer|'
-                r'menu[-_]?wrap|navbar|navigation|'
-                r'elementor-nav-menu|elementor-menu|elementor-widget-nav-menu|'
-                r'et_pb_menu|divi-menu|menu-item-has-children|\bmenu\b|'
-                r'offcanvas|hamburger|dropdown-menu)',
-                _re.I,
-            )
-            role_nav_re = _re.compile(r'^(navigation|menubar|menu)$', _re.I)
-            for el in list(soup_body.find_all(['div', 'section', 'ul', 'aside'])):
-                if not el.parent:
-                    continue
-                classes = ' '.join(el.get('class') or [])
-                ident = el.get('id') or ''
-                role = el.get('role') or ''
-                aria = el.get('aria-label') or ''
-                if (nav_like_re.search(classes) or nav_like_re.search(ident)
-                        or role_nav_re.match(role) or nav_like_re.search(aria)):
-                    el.decompose()
-        except Exception:
-            pass
-        # Pick the first <article> that ISN'T a post-grid / related-posts card.
-        # Elementor and many blog themes render recent/related posts as
-        # <article class="elementor-post elementor-grid-item ...">; grabbing the
-        # first of those captures the same boilerplate snippet on every page, so
-        # every post looks like an exact body duplicate. Skip those cards.
-        def _real_article(sb):
-            for art in sb.find_all('article'):
-                cls = ' '.join(art.get('class') or [])
-                if _re.search(r'elementor-post|elementor-grid-item|elementor-posts|post-grid|related|recent[-_]?post|widget', cls, _re.I):
-                    continue
-                return art
-            return None
-
-        main_container = (
-            soup_body.find('main')
-            or soup_body.find(attrs={'role': 'main'})
-            # Elementor Theme Builder renders the real post body in this widget
-            # and ships no <main>/<article> wrapper, so it must come before the
-            # generic <article> fallback (which would otherwise hit a grid card).
-            or soup_body.find(attrs={'class': _re.compile(r'elementor-widget-theme-post-content', _re.I)})
-            or _real_article(soup_body)
-            or soup_body.find(id=_re.compile(r'^(main|content|primary|page-content)$', _re.I))
-            or soup_body.find(attrs={'class': _re.compile(r'(^|\s)(main-content|page-content|entry-content|post-content|article-content|site-main)(\s|$)', _re.I)})
-        )
-        text_root = main_container if main_container else soup_body
-        body_text = text_root.get_text(separator=' ', strip=True)
+        body_text = _content_text(raw_html)
         result['word_count'] = len(body_text.split()) if body_text else 0
         # Cap body text at 30k chars — sufficient for shingle-based near-dup
         # detection on any reasonable page; keeps the SSE payload bounded.

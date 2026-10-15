@@ -263,6 +263,17 @@ check('a page the sitemap lists is not called missing',
 check('a linked page in the sitemap is not called an orphan',
       not in_report('orphan_in_sitemap', '/about/'))
 
+# ── the raw-HTML parser behind the JS vs non-JS diff ─────────────────────────
+_nojs = crawler._parse_no_js_subset(
+    '<html><head><script type="application/ld+json">{"@type": "Organization"}</script></head>'
+    '<body><div itemscope itemtype="https://schema.org/CreativeWork"><p>one two three</p></div>'
+    '<script>var x = 1;</script></body></html>', BASE + '/')
+check('the no-JS parser reads JSON-LD (scripts used to be stripped first)',
+      'Organization' in _nojs['schema_types'])
+check('the no-JS parser reads microdata, as the main parser does',
+      'CreativeWork' in _nojs['schema_types'])
+check('the no-JS word count still leaves scripts out', _nojs['word_count'] == 3)
+
 # ── report ────────────────────────────────────────────────────────────────────
 if FAILURES:
     for f in FAILURES:
