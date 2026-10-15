@@ -3838,7 +3838,12 @@ function stopCrawl() {
 // not handled — the dispatcher falls through to the page-level summary.
 
 function _scCsvCell(v) {
-  const s = (v === undefined || v === null) ? '' : String(v);
+  let s = (v === undefined || v === null) ? '' : String(v);
+  // Spreadsheet apps run a cell that starts with = + - @ as a formula, and a
+  // crawled site controls titles, metas and URLs. A leading apostrophe keeps
+  // it as text (the OWASP CSV-injection guidance). Plain numbers like -3 are
+  // left alone so numeric columns stay numeric.
+  if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = "'" + s;
   return '"' + s.replace(/"/g, '""') + '"';
 }
 
@@ -4938,7 +4943,9 @@ function openCrawlLoader(opts) {
       const loadBtn = compareOnly
         ? ''
         : `<button onclick="loadSavedCrawl(${jsArg(c.file)})" style="padding:6px 10px;font-size:11px;background:#6366f1;color:#fff;border:0;border-radius:4px;cursor:pointer;">Load</button>`;
-      const delBtn = compareOnly
+      // Crawls saved by another tool are read-only here (the server refuses
+      // to delete them), so they get no delete button.
+      const delBtn = (compareOnly || (c.source && c.source !== 'site-crawler'))
         ? ''
         : `<button onclick="deleteSavedCrawl(${jsArg(c.file)})" title="Delete" aria-label="Delete saved crawl" style="padding:6px 8px;font-size:11px;background:transparent;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;">✕</button>`;
       const searchBlob = (`${seed} ${c.name || ''} ${savedBy}`).toLowerCase();

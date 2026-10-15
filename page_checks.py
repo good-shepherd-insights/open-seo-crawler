@@ -20,7 +20,7 @@ positions are what matters.
 import collections
 import re
 from datetime import datetime, timezone
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, parse_qsl, urlencode
 
 # Tags allowed inside <head>. The first tag outside this set closes the head in
 # every browser, whatever the markup claims. <template> is allowed too but is
@@ -686,7 +686,14 @@ def url_shape_issues(page_url):
 
 
 def _norm_url(value):
-    """Scheme-insensitive, www-insensitive, trailing-slash-insensitive key."""
+    """Scheme-insensitive, www-insensitive, trailing-slash-insensitive key.
+
+    The query string stays in the key (parameters sorted, so their order does
+    not matter). Dropping it merged /a?id=1 with /a?id=7: a canonical naming
+    /b?id=7, a 200 page, was reported as "Canonical points to a non-200 URL"
+    because /b?id=1 happened to 404, and ?lang= hreflang alternates collapsed
+    into one page.
+    """
     if not value:
         return ''
     try:
@@ -697,7 +704,8 @@ def _norm_url(value):
     if host.startswith('www.'):
         host = host[4:]
     path = (p.path or '/').rstrip('/') or '/'
-    return host + path
+    query = urlencode(sorted(parse_qsl(p.query, keep_blank_values=True))) if p.query else ''
+    return host + path + ('?' + query if query else '')
 
 
 def _is_indexable_row(row):

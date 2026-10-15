@@ -48,6 +48,14 @@ def _refuse_cross_site_writes():
     """
     if request.method in ('GET', 'HEAD', 'OPTIONS'):
         return None
+    fetch_site = (request.headers.get('Sec-Fetch-Site') or '').lower()
+    if fetch_site and fetch_site not in ('same-origin', 'none'):
+        return jsonify({'ok': False, 'error': 'Refused: the request came from another site.'}), 403
+    origin = request.headers.get('Origin')
+    if origin is not None:
+        if origin == 'null' or urlparse(origin).netloc.lower() != (request.host or '').lower():
+            return jsonify({'ok': False, 'error': 'Refused: the request came from another site.'}), 403
+    return None
 
 # crawl_id -> {'include': [patterns], 'exclude': [patterns]}. Workers read on
 # every URL so the Apply button can mutate rules mid-crawl. Replace list refs
@@ -66,6 +74,49 @@ ACTIVE_CRAWL_LIMITS = {}
 # older than SUSPENDED_CRAWL_TTL on access.
 SUSPENDED_CRAWLS = {}
 SUSPENDED_CRAWL_TTL = 30 * 60  # 30 minutes
+
+
+# A typed URL that already names its scheme. startswith('http') was used
+# before, which mistook a bare domain such as httparchive.org for a full URL
+# and sent it off with no scheme at all.
+_HAS_SCHEME_RE = _re.compile(r'^https?://', _re.I)
+
+_META_CHARSET_RE = _re.compile(rb'<meta[^>]+charset\s*=\s*["\']?\s*([A-Za-z0-9_.:-]+)', _re.I)
+
+
+def _filename_host(domain):
+    """Host part for an export file name. The UI may send an origin such as
+    https://www.example.com, which used to come out as httpsexample.com."""
+    d = (domain or '').strip()
+    host = urlparse(d).netloc if '://' in d else d.split('/')[0]
+    host = host.lower().lstrip('.')
+    if host.startswith('www.'):
+        host = host[4:]
+    return _re.sub(r'[^a-z0-9.-]', '', host.replace(':', '-'))
+
+
+def _decoded_html(resp):
+    """Body of an HTML response, decoded the way a browser decodes it.
+
+    requests falls back to ISO-8859-1 for any text/* response whose
+    Content-Type names no charset (an old HTTP/1.1 default; nginx sends
+    plain "text/html" out of the box). A UTF-8 "Café" then reads "CafÃ©"
+    in titles, metas and H1s, and every length check counts the extra
+    bytes. Browsers use a byte-order mark, then <meta charset>, and
+    otherwise assume UTF-8, so this does the same.
+    """
+    ctype = (resp.headers.get('Content-Type') or '').lower()
+    if 'charset=' in ctype:
+        return resp.text
+    raw = resp.content or b''
+    if raw.startswith(b'\xef\xbb\xbf'):
+        return raw[3:].decode('utf-8', errors='replace')
+    m = _META_CHARSET_RE.search(raw[:4096])
+    enc = m.group(1).decode('ascii', 'ignore') if m else 'utf-8'
+    try:
+        return raw.decode(enc, errors='replace')
+    except LookupError:
+        return raw.decode('utf-8', errors='replace')
 
 
 def _http_get(url, **kwargs):
@@ -153,28 +204,17 @@ def _build_robots_checker(robots_text):
     (which is already Google-spec) and apply longest-pattern-wins so a
     more specific Allow can lift a broader Disallow.
 
-    Reads the User-agent: * block only - we crawl as a generic bot.
+    Reads the User-agent: * rules only - we crawl as a generic bot. Groups
+    come from _parse_robots_groups, which keeps stacked User-agent lines
+    together: a group written "User-agent: *" then "User-agent: Googlebot"
+    above its rules used to lose those rules here, because the second line
+    switched the * group off before any rule was read.
     """
     if not robots_text:
         return lambda u: True
-    allows, disallows = [], []
-    in_star_block = False
-    for line in robots_text.splitlines():
-        line = line.split('#', 1)[0].strip()
-        if not line or ':' not in line:
-            continue
-        key, _, value = line.partition(':')
-        key = key.strip().lower()
-        value = value.strip()
-        if key == 'user-agent':
-            in_star_block = (value == '*')
-            continue
-        if not in_star_block:
-            continue
-        if key == 'disallow' and value:
-            disallows.append(value)
-        elif key == 'allow' and value:
-            allows.append(value)
+    star = _parse_robots_groups(robots_text).get('*') or {}
+    disallows = [v for v in star.get('disallow', []) if v]
+    allows = [v for v in star.get('allow', []) if v]
     if not disallows and not allows:
         return lambda u: True
 
@@ -520,7 +560,7 @@ def _analyze_crawl_budget(start_url, max_pages=14, timeout=10):
     query-parameter, classify crawl-budget traps, return robots.txt rules."""
     import html as _html2
     from urllib.parse import urlparse, urljoin, parse_qsl
-    if not start_url.startswith('http'):
+    if not _HAS_SCHEME_RE.match(start_url):
         start_url = 'https://' + start_url
     pu = urlparse(start_url)
     host = pu.netloc.replace('www.', '')
@@ -1108,13 +1148,13 @@ def detect_cms_route():
     url = (data.get('url') or '').strip()
     if not url:
         return jsonify({'error': 'URL required'}), 400
-    if not url.startswith('http'):
+    if not _HAS_SCHEME_RE.match(url):
         url = 'https://' + url
     try:
         resp = _http_get(url, timeout=10, headers={
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/132.0.0.0 Safari/537.36'
         })
-        result = detect_cms(url, resp.text, dict(resp.headers))
+        result = detect_cms(url, _decoded_html(resp), dict(resp.headers))
         if result.get('cms'):
             prof = CMS_PROFILES.get(result['cms'], {})
             result['profile'] = {
@@ -1801,7 +1841,7 @@ def _discover_js_click_links(pw_page, page_url):
     return out
 
 
-def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, capture_no_js=False, challenge_browser=None):
+def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, capture_no_js=False, challenge_browser=None, effective_url=None):
     """Crawl a single page and return audit data dict.
 
     If ``pw_page`` (a live Playwright page) is provided, the HTML body will be
@@ -1814,10 +1854,16 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
     ``result['non_js']`` plus a diff/severity summary at ``result['js_diff']``.
     Lets the user see what content is JS-only and therefore at risk for AI
     crawlers (GPTBot, ClaudeBot etc.) which mostly don't execute JS.
+
+    ``effective_url``: the address to audit when ``url`` is only what gets
+    fetched. Recrawl fetches a cache-busted copy (?_cb=...) so a CDN cannot
+    hand back the HTML from before the fix, and the row, the URL checks and
+    the canonical comparison still use the real address.
     """
     from urllib.parse import urlparse, urljoin
+    audit_url = effective_url or url
     result = {
-        'url': url, 'status_code': 0, 'content_type': '', 'last_modified': '', 'response_time': 0,
+        'url': audit_url, 'status_code': 0, 'content_type': '', 'last_modified': '', 'response_time': 0,
         'title': '', 'title_len': 0, 'meta_description': '', 'meta_len': 0,
         'h1': '', 'h1_list': [], 'h2_list': [], 'h2_count': 0,
         'canonical': '', 'canonical_match': False, 'canonical_kind': None,
@@ -2033,26 +2079,27 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
                 # returned 200, not the URL we requested. Without this, the seed
                 # AND the redirect target both end up as separate "page" rows when
                 # the target is later discovered via an internal link.
-                result['url'] = resp.url
-                result['original_url'] = url
+                if not effective_url:
+                    result['url'] = resp.url
+                    result['original_url'] = url
 
         # --- URL issues (from the source URL, not redirect target) ---
         from urllib.parse import urlparse as _urlparse2
-        _parsed_url = _urlparse2(url)
+        _parsed_url = _urlparse2(audit_url)
         _url_path_query = _parsed_url.path + (('?' + _parsed_url.query) if _parsed_url.query else '')
         _url_issues = []
         if any(c.isupper() for c in _parsed_url.path):
             _url_issues.append('uppercase')
         if '_' in _parsed_url.path:
             _url_issues.append('underscores')
-        if ' ' in url or '%20' in _parsed_url.path:
+        if ' ' in audit_url or '%20' in _parsed_url.path:
             _url_issues.append('contains space')
-        if len(url) > 115:
-            _url_issues.append(f'over 115 chars ({len(url)})')
+        if len(audit_url) > 115:
+            _url_issues.append(f'over 115 chars ({len(audit_url)})')
         if '//' in _parsed_url.path:
             _url_issues.append('multiple slashes')
         try:
-            url.encode('ascii')
+            audit_url.encode('ascii')
         except UnicodeEncodeError:
             _url_issues.append('non-ASCII characters')
         if _parsed_url.query:
@@ -2062,7 +2109,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         # Path shapes that make duplicate or infinite URL space: a segment
         # repeating, and internal search result pages.
         try:
-            _url_issues.extend(page_checks.url_shape_issues(url))
+            _url_issues.extend(page_checks.url_shape_issues(audit_url))
         except Exception:
             pass
         result['url_issues'] = _url_issues
@@ -2104,7 +2151,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
             return result
 
         # Limit body size
-        raw_html = (challenge_html or resp.text)[:5_000_000]
+        raw_html = (challenge_html or _decoded_html(resp))[:5_000_000]
         # Keep pre-JS HTML for the JS-vs-non-JS diff (cheap; one extra ref).
         pre_js_html = raw_html
         result['js_rendered'] = False
@@ -2169,8 +2216,9 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         can_tag = soup.find('link', attrs={'rel': 'canonical'})
         result['canonical'] = can_tag.get('href', '') if can_tag else ''
         if result['canonical']:
-            can_abs = urljoin(url, result['canonical'])
-            same = can_abs.rstrip('/') == url.rstrip('/') or can_abs.rstrip('/') == resp.url.rstrip('/')
+            can_abs = urljoin(audit_url, result['canonical'])
+            same = (can_abs.rstrip('/') == audit_url.rstrip('/')
+                    or (not effective_url and can_abs.rstrip('/') == resp.url.rstrip('/')))
             result['canonical_match'] = same
             if same:
                 result['canonical_kind'] = 'self'
@@ -2186,7 +2234,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
             hl = ln.get('hreflang')
             hf = ln.get('href')
             if hl and hf:
-                result['hreflang'].append({'lang': hl, 'href': urljoin(url, hf)})
+                result['hreflang'].append({'lang': hl, 'href': urljoin(audit_url, hf)})
 
         # Schema types — schema.org @type can be a single string or a list
         # ("@type": ["Service", "LocalBusiness"]). Flatten to individual
@@ -3135,7 +3183,7 @@ def fetch_robots_txt():
     target = (request.args.get('url') or '').strip()
     if not target:
         return jsonify({'error': 'url required'}), 400
-    if not target.startswith('http'):
+    if not _HAS_SCHEME_RE.match(target):
         target = 'https://' + target.lstrip('/')
     try:
         parsed = urlparse(target)
@@ -3209,7 +3257,7 @@ def sitemap_analyse():
     """
     data = request.get_json() or {}
     domain = (data.get('domain') or '').rstrip('/')
-    if domain and not domain.startswith('http'):
+    if domain and not _HAS_SCHEME_RE.match(domain):
         domain = 'https://' + domain
     results = data.get('results') or []
     inlinks_map = data.get('inlinks') or {}
@@ -3219,7 +3267,7 @@ def sitemap_analyse():
         return jsonify({'error': 'domain required'}), 400
 
     if manual_sm:
-        if not manual_sm.startswith('http'):
+        if not _HAS_SCHEME_RE.match(manual_sm):
             manual_sm = 'https://' + manual_sm.lstrip('/')
         discovered = [{'url': manual_sm, 'source': 'manual'}]
         discovery_warnings = []
@@ -3500,19 +3548,32 @@ def recrawl_url():
     """Re-crawl a single URL and return fresh page audit data."""
     import requests as _req
     from urllib.parse import urlparse
+    import time as _time
+    from urllib.parse import urlunparse as _uup, parse_qsl as _pqsl, urlencode as _uenc
     data = request.get_json() or {}
     url = (data.get('url') or '').strip()
     if not url:
         return jsonify({'error': 'URL required'}), 400
-    domain = urlparse(url).netloc
+    parsed = urlparse(url)
+    # Same form the crawl uses (lower case, no www.), or every internal link
+    # on a www site is judged external and the row loses its link counts.
+    domain = parsed.netloc.lower().replace('www.', '')
+    # Recrawl is for "I just fixed this page". Ask past any page cache: a
+    # throwaway query parameter misses URL-keyed CDN caches and the headers
+    # ask the rest to revalidate. The row is still keyed on the real URL.
+    qs = _pqsl(parsed.query, keep_blank_values=True)
+    qs.append(('_cb', str(int(_time.time() * 1000))))
+    fetch_url = _uup(parsed._replace(query=_uenc(qs)))
     try:
         with _req.Session() as session:
             session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
                 'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
             })
-            result = _crawl_page(url, session, domain)
+            result = _crawl_page(fetch_url, session, domain, effective_url=url)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -3556,7 +3617,7 @@ def _probe_url_traps(base, results, session):
             entry = {'kind': kind, 'url': purl, 'status': resp.status_code}
             if resp.status_code == 200:
                 out['soft_404' if kind == 'root' else 'nested_trap'] = True
-                m = re.search(r'<title[^>]*>(.*?)</title>', resp.text[:30000], re.I | re.S)
+                m = re.search(r'<title[^>]*>(.*?)</title>', _decoded_html(resp)[:30000], re.I | re.S)
                 title = (m.group(1).strip() if m else '')[:200]
                 if title:
                     entry['title'] = title
@@ -3606,7 +3667,7 @@ def crawl_site():
         seed_url = (data.get('url', '') or '').strip()
         if not seed_url:
             return json.dumps({'error': 'URL is required'}), 400
-        if not seed_url.startswith('http'):
+        if not _HAS_SCHEME_RE.match(seed_url):
             seed_url = 'https://' + seed_url
 
         max_pages = int(data.get('max_pages', 500) or 500)
@@ -3859,6 +3920,8 @@ def crawl_site():
             errors = int(resumed_state.get('errors', 0))
             total_time = float(resumed_state.get('total_time', 0))
             inlinks_map = dict(resumed_state.get('inlinks_map', {}))
+            inlink_seen = {(t, e.get('source'), e.get('anchor'), e.get('placement'))
+                           for t, bucket in inlinks_map.items() for e in bucket}
             yield f"data: {json.dumps({'type': 'resumed', 'previous_pages': len(results), 'queued': len(queue), 'errors': errors})}\n\n"
         else:
             queue = deque()
@@ -3876,6 +3939,11 @@ def crawl_site():
             total_time = 0
             # Map of target URL -> list of source URLs linking to it (inlinks / Screaming Frog style)
             inlinks_map = {}
+            # (target, source, anchor, placement) already recorded. A set,
+            # because scanning each bucket was quadratic: sitewide nav links
+            # put thousands of entries in the same buckets, and 4,000 pages
+            # cost close to a minute of CPU in this one loop.
+            inlink_seen = set()
 
         tracked_kws = []  # left in place for payload compatibility; no external data sources in the public build
         yield f"data: {json.dumps({'type': 'start', 'domain': domain, 'workers': max_workers, 'crawl_id': crawl_id})}\n\n"
@@ -3884,7 +3952,7 @@ def crawl_site():
         # but we want the info up-front so the UI can badge + offer one-click recommendations).
         try:
             cms_resp = session.get(seed_url, timeout=10, allow_redirects=True)
-            cms_info = detect_cms(seed_url, cms_resp.text, dict(cms_resp.headers))
+            cms_info = detect_cms(seed_url, _decoded_html(cms_resp), dict(cms_resp.headers))
             if cms_info.get('cms'):
                 prof = CMS_PROFILES.get(cms_info['cms'], {})
                 cms_info['profile'] = {
@@ -4101,10 +4169,11 @@ def crawl_site():
                                 placement = entry[2] if len(entry) > 2 else ''
                             else:
                                 link, anchor, placement = entry, '', ''
-                            bucket = inlinks_map.setdefault(link, [])
-                            key = (source_url, anchor, placement)
-                            if not any((e.get('source'), e.get('anchor'), e.get('placement')) == key for e in bucket):
-                                bucket.append({'source': source_url, 'anchor': anchor, 'placement': placement})
+                            key = (link, source_url, anchor, placement)
+                            if key not in inlink_seen:
+                                inlink_seen.add(key)
+                                inlinks_map.setdefault(link, []).append(
+                                    {'source': source_url, 'anchor': anchor, 'placement': placement})
                             alt = _crawl_slash_alt(link)
                             if link not in visited and (not alt or alt not in visited) and _url_allowed(link):
                                 # Mark on enqueue (not dequeue) so the same URL
@@ -4220,6 +4289,14 @@ def crawl_site():
             ACTIVE_CRAWL_RULES.pop(crawl_id, None)
             ACTIVE_CRAWL_LIMITS.pop(crawl_id, None)
             return
+        except BaseException:
+            # An error, or the browser dropping the stream (GeneratorExit),
+            # skips the cleanup that follows this block. Close the HTTP
+            # session and the headless Chromium here, or they stay alive
+            # until the app restarts.
+            session.close()
+            _teardown_pw(pw_renderer)
+            raise
         finally:
             # The challenge browser owns an Xvfb display and a Chrome process.
             # Close it on every exit path — an unhandled error here would
@@ -4670,8 +4747,14 @@ def crawl_delete():
     fn = (request.json or {}).get('file', '')
     if not fn or '/' in fn or '\\' in fn or not fn.endswith('.json'):
         return jsonify({'error': 'Invalid file'}), 400
-    path = _find_crawl_path(fn)
-    if not path:
+    # Only crawls this app saved. The extra folders in
+    # SITE_CRAWLER_EXTRA_CRAWL_DIRS belong to other tools and are read-only
+    # here, but the lookup searched them too, so the delete button on an
+    # "external" crawl removed the other tool's file.
+    path = os.path.join(_CRAWL_FOLDER, fn)
+    if not os.path.exists(path):
+        if _find_crawl_path(fn):
+            return jsonify({'error': 'This crawl belongs to another tool and is read-only here.'}), 403
         return jsonify({'error': 'Not found'}), 404
     try:
         os.remove(path)
@@ -4690,8 +4773,10 @@ def crawl_compare():
     def _load_file(fn):
         if not fn or '/' in fn or '\\' in fn or not fn.endswith('.json'):
             return None, 'Invalid file'
-        fp = os.path.join(_CRAWL_FOLDER, fn)
-        if not os.path.exists(fp):
+        # Any folder the loader lists, so an external crawl that Load opens
+        # can be compared too (it used to answer "Not found").
+        fp = _find_crawl_path(fn)
+        if not fp:
             return None, 'Not found'
         try:
             with open(fp) as f: d = json.load(f)
@@ -4972,11 +5057,25 @@ def export_crawl_xlsx():
     """
     import io as _io
     import openpyxl
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE as _XL_ILLEGAL
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     data = request.json or {}
     results = data.get('results', [])
     domain = data.get('domain', 'site')
+
+    def _put(sheet, row, col, value):
+        """Write a cell from crawled data. Control characters are dropped:
+        openpyxl refuses them, and one stray \\x07 in a title used to fail
+        the whole export. A string starting with = is kept as text, because
+        openpyxl would otherwise store it as a live formula and a crawled
+        title such as =HYPERLINK(...) would run when the sheet is opened."""
+        if isinstance(value, str):
+            value = _XL_ILLEGAL.sub('', value)
+        cell = sheet.cell(row=row, column=col, value=value)
+        if isinstance(value, str) and value.startswith('='):
+            cell.data_type = 's'
+        return cell
 
     if not results:
         return jsonify({'error': 'No results to export'}), 400
@@ -5020,7 +5119,7 @@ def export_crawl_xlsx():
             '; '.join(r.get('issues', []))
         ]
         for ci, v in enumerate(vals, 1):
-            cell = ws.cell(row=ri, column=ci, value=v)
+            cell = _put(ws, ri, ci, v)
             cell.font = cell_font
             cell.border = thin_border
         status = r.get('status_code', 0)
@@ -5055,9 +5154,9 @@ def export_crawl_xlsx():
             base = issue.split('(')[0].strip()
             issue_map.setdefault(base, []).append(r.get('url', ''))
     for ri, (issue, urls) in enumerate(sorted(issue_map.items(), key=lambda x: -len(x[1])), 2):
-        ws2.cell(row=ri, column=1, value=issue).font = cell_font
-        ws2.cell(row=ri, column=2, value=len(urls)).font = Font(name='Calibri', size=10, bold=True)
-        ws2.cell(row=ri, column=3, value='; '.join(urls[:10])).font = cell_font
+        _put(ws2, ri, 1, issue).font = cell_font
+        _put(ws2, ri, 2, len(urls)).font = Font(name='Calibri', size=10, bold=True)
+        _put(ws2, ri, 3, '; '.join(urls[:10])).font = cell_font
     ws2.column_dimensions['A'].width = 30
     ws2.column_dimensions['B'].width = 8
     ws2.column_dimensions['C'].width = 80
@@ -5066,7 +5165,7 @@ def export_crawl_xlsx():
     extra = data.get('extra_sheets') or []
     used_names = {ws.title, ws2.title}
     def _safe_sheet_name(n):
-        s = _re.sub(r'[:\\/\?\*\[\]]', '-', str(n or 'Sheet'))[:31].strip() or 'Sheet'
+        s = _re.sub(r'[:\\/\?\*\[\]]', '-', _XL_ILLEGAL.sub('', str(n or 'Sheet')))[:31].strip() or 'Sheet'
         if s in used_names:
             base = s[:28]
             i = 2
@@ -5083,7 +5182,7 @@ def export_crawl_xlsx():
             continue
         ws_e = wb.create_sheet(name)
         for ci, h in enumerate(header, 1):
-            cell = ws_e.cell(row=1, column=ci, value=h)
+            cell = _put(ws_e, 1, ci, h)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -5094,7 +5193,7 @@ def export_crawl_xlsx():
                     v = ', '.join(str(x) for x in v)
                 elif isinstance(v, dict):
                     v = json.dumps(v, ensure_ascii=False)
-                cell = ws_e.cell(row=ri, column=ci, value=v)
+                cell = _put(ws_e, ri, ci, v)
                 cell.font = cell_font
                 cell.border = thin_border
         for col in ws_e.columns:
@@ -5110,7 +5209,7 @@ def export_crawl_xlsx():
     wb.save(buf)
     buf.seek(0)
 
-    safe_domain = _re.sub(r'[^a-zA-Z0-9.-]', '', (domain or '').lstrip('.').replace('www.', '', 1))
+    safe_domain = _filename_host(domain)
     from datetime import datetime as _dt
     _ts = _dt.now().strftime('%Y-%m-%d-%H%M')
     _name = '-'.join([p for p in ['crawl', safe_domain, _ts] if p]) + '.xlsx'
@@ -5203,7 +5302,7 @@ def export_crawl_sitemap():
         lines.append('')
         return '\n'.join(lines)
 
-    safe_domain = _re.sub(r'[^a-zA-Z0-9.-]', '', (domain or '').lstrip('.').replace('www.', '', 1))
+    safe_domain = _filename_host(domain)
     _ts = _dt.now().strftime('%Y-%m-%d-%H%M')
 
     if len(urls) <= URLS_PER_SITEMAP:

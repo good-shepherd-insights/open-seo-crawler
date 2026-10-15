@@ -86,7 +86,8 @@ def build(base='http://127.0.0.1:8099'):
         # checks have nothing to compare a canonical against.
         '<a href="/gone/">A page that 404s</a> '
         '<a href="/old-url/">A page that redirects</a> '
-        '<a href="/noindex-target/">A noindex page</a></p>',
+        '<a href="/noindex-target/">A noindex page</a> '
+        '<a href="/accents/">Accented title</a></p>',
         head=f'<title>Fixture home</title><meta name="description" content="A home page for the fault fixture site, long enough not to be flagged as short by the meta description check.">{canonical(base + "/")}'))
 
     write('/clean-second/', page(
@@ -203,6 +204,15 @@ def build(base='http://127.0.0.1:8099'):
     body = f'{NAV}<h1>A very large document</h1>' + filler * 1900
     write('/big/', page(body,
                         head=f'<title>A very large document</title><meta name="description" content="An HTML document deliberately larger than two megabytes, past the point Google stops reading one.">{canonical(base + "/big/")}'))
+
+    # Non-ASCII text with no charset anywhere: the server sends a bare
+    # text/html and the page has no <meta charset>. Browsers read that as
+    # UTF-8; a crawler that falls back to ISO-8859-1 reports mojibake.
+    write('/accents/', '<!doctype html><html lang="fr"><head>'
+          '<title>Café crème brûlée</title>'
+          '<meta name="description" content="Une page en français avec des accents, servie sans charset, pour vérifier le décodage.">'
+          f'{canonical(base + "/accents/")}</head><body>{NAV}<h1>Crème brûlée</h1><p>'
+          + ('Du texte ordinaire avec des accents: é, è, ê, ç, à. ' * 30) + '</p></body></html>')
 
     # A page only the sitemap knows about, for the sitemap-only report.
     write('/sitemap-only/', page(

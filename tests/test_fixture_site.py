@@ -232,6 +232,13 @@ check('internal links on a localhost site are not called local links',
 check('a form posting to localhost is not called insecure',
       quiet('/', 'form(s) submit over http'))
 
+# ── decoding ──────────────────────────────────────────────────────────────────
+_acc = by_url.get(_key(BASE + '/accents/')) or {}
+check(f'a page with no charset is read as UTF-8 (got {_acc.get("title")!r})',
+      _acc.get('title') == 'Café crème brûlée')
+check(f'its title length counts characters, not bytes (got {_acc.get("title_len")})',
+      _acc.get('title_len') == 17)
+
 # ── sitemap analysis ──────────────────────────────────────────────────────────
 reports = sitemap.get('reports') or {}
 
