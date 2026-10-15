@@ -38,6 +38,9 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
 
 ## What's new (recent additions)
 
+- **AI brief**: one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
+- **Every report exports**: Export view now works on every report tab (All Titles, Redirect Chains, Hreflang, Deep Pages and the rest), and the .xlsx workbook adds a sheet for each report that has rows.
+- **Safer and steadier**: crawled titles, URLs and robots.txt lines can no longer run script inside the app, other websites can no longer trigger Update or Restart, the Update button restarts cleanly under systemd and launchd, and sitemap analysis works again.
 - **Malformed link href detection**: a scheme-less `href` containing a raw space (a street address or Google Maps Plus Code pasted straight into a link, e.g. `<a href="7FG4+8Q Springfield">Directions</a>`) used to resolve relative to every page carrying it and flood the crawl with phantom 404s. One broken footer link on a 300-page site meant ~300 fake 404 rows. Now it's skipped as a link and reported once per page as a **Malformed link href** issue naming the offending text.
 - **JS vs no-JS compare mode**: with Render JS on, tick *Compare with non-JS HTML* to crawl every page in BOTH modes (Playwright-rendered and raw HTML). The per-page diff shows exactly which content is invisible to AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended), which mostly don't execute JavaScript.
 - **Shared-instance support**: point the saved-crawls list at extra folders (`SITE_CRAWLER_EXTRA_CRAWL_DIRS`) so one office instance shows crawls from multiple tools, and label who ran each crawl by IP (`SITE_CRAWLER_USER_MAP`).
@@ -132,7 +135,8 @@ Every report exports to XLSX so you can hand it to a content team or dev:
 - **Issue grouping**: click any severity and see issues grouped by type with the worst-affected pages listed under each.
 - **Page detail dock**: click any URL for full page metadata, all issues for that page, inlinks (with anchor text), outlinks.
 - **Dark mode**: toggle in the topbar, persists per user.
-- **Saved crawls**: every crawl auto-saved, reopenable from the Load Saved modal.
+- **Saved crawls**: every crawl auto-saved, reopenable from the Load Saved modal, with the date it was saved shown when you open one.
+- **AI brief**: copy or download a compact brief of the crawl, with an editable prompt, for any AI assistant.
 - **Sitemap + XLSX export buttons** in the topbar, one click each.
 
 ## Quick install (manual)

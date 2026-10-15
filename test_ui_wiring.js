@@ -54,20 +54,17 @@ const sevOf = new Function(errRe + warnRe + grab("function sevOf(issue)", "\n}\n
 const matchesCategory = new Function(
   errRe + warnRe + grab("function matchesCategory(page, cat)", "\n}\n") + "\nreturn matchesCategory;")();
 
-// Both normalisers must carry every rule, or the two panels disagree.
-const normalizers = [];
-for (let i = 0, at = 0; (at = SRC.indexOf("  const normalize = (issue) => {", at)) >= 0; i++) {
-  const end = SRC.indexOf("\n  };\n", at);
-  normalizers.push(new Function(
-    SRC.slice(at, end + 6).replace("  const normalize", "const normalize") + "\nreturn normalize;")());
-  at = end;
-}
+// One shared grouping function feeds every summary panel, so the panels
+// cannot disagree. Both panels must use it rather than a copy of their own.
+const normalizers = [new Function(grab("function _scIssueGroup(issue)", "\n}\n") + "\nreturn _scIssueGroup;")()];
+const panelsUsingShared = (SRC.match(/const normalize = _scIssueGroup;/g) || []).length;
 
 let passed = 0;
 const failures = [];
 const check = (name, cond) => { cond ? passed++ : failures.push(name); };
 
-check("both summary panels have a normalize map", normalizers.length >= 2);
+check("both summary panels use the shared grouping", panelsUsingShared >= 2);
+check("no summary panel keeps its own copy of the map", !SRC.includes("const normalize = (issue) =>"));
 
 for (const [issue, severity, slug] of CASES) {
   check(`sevOf("${issue.slice(0, 46)}") is ${severity}`, sevOf(issue) === severity);
