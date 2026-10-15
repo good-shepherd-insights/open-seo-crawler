@@ -22,6 +22,7 @@ import socket
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -99,6 +100,21 @@ with post('/crawl', {'url': BASE + '/', 'max_pages': 60, 'delay': 0,
         elif kind == 'complete':
             complete = msg
             break
+
+# ── sitemap analysis, through the route the UI calls after every crawl ───────
+# Inlinks are built the way the browser builds them, from each row's links.
+inlinks = {}
+for _r in rows:
+    for _entry in (_r.get('internal_link_urls') or []):
+        _target = _entry[0] if isinstance(_entry, list) else _entry
+        if _target:
+            inlinks.setdefault(_target, []).append({'source': _r.get('url')})
+try:
+    with post('/sitemap-analyse', {'domain': BASE, 'results': rows,
+                                   'inlinks': inlinks}, timeout=60) as resp:
+        sitemap = json.loads(resp.read())
+except urllib.error.HTTPError as e:
+    sitemap = {'http_error': e.code}
 
 httpd.shutdown()
 
@@ -215,6 +231,30 @@ check('internal links on a localhost site are not called local links',
       quiet('/', 'link(s) to a local or staging host'))
 check('a form posting to localhost is not called insecure',
       quiet('/', 'form(s) submit over http'))
+
+# ── sitemap analysis ──────────────────────────────────────────────────────────
+reports = sitemap.get('reports') or {}
+
+
+def in_report(key, path):
+    urls = [v.get('url') if isinstance(v, dict) else v for v in (reports.get(key) or [])]
+    return any(_key(u) == _key(BASE + path) for u in urls)
+
+
+check(f'sitemap analysis answers (got {sitemap.get("http_error") or "a report"})',
+      'reports' in sitemap)
+check('the sitemap is found through robots.txt', bool(sitemap.get('sitemaps_found')))
+check('a sitemap URL that 404s is reported', in_report('non_200_in_sitemap', '/gone/'))
+check('a sitemap URL that redirects is reported',
+      in_report('redirects_in_sitemap', '/old-url/'))
+check('a sitemap URL no page links to is reported',
+      in_report('sitemap_only', '/sitemap-only/') or in_report('orphan_in_sitemap', '/sitemap-only/'))
+check('a crawled page the sitemap leaves out is reported',
+      in_report('missing_from_sitemap', '/clean-second/'))
+check('a page the sitemap lists is not called missing',
+      not in_report('missing_from_sitemap', '/about/'))
+check('a linked page in the sitemap is not called an orphan',
+      not in_report('orphan_in_sitemap', '/about/'))
 
 # ── report ────────────────────────────────────────────────────────────────────
 if FAILURES:

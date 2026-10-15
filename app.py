@@ -3032,7 +3032,6 @@ def fetch_robots_txt():
         return jsonify({'error': str(e)[:200]}), 200
 
 
-@app.route('/sitemap-analyse', methods=['POST'])
 def _bare_host(url):
     """Normalise a URL/domain to a bare host for matching: strip scheme,
     www., path and trailing slash."""
@@ -3077,6 +3076,7 @@ def _foreign_host_warning(foreign_hosts, domain):
             f"so they are not orphans of this crawl.")
 
 
+@app.route('/sitemap-analyse', methods=['POST'])
 def sitemap_analyse():
     """Discover the site's sitemap(s) and diff against a crawl.
 
@@ -3120,11 +3120,19 @@ def sitemap_analyse():
         discovery_warnings = list(discovery_warnings) + [_fh_warning]
 
     crawl_by_norm = {}
+    # A redirected row carries the URL it landed on; the URL that was asked
+    # for (and that a sitemap lists) is in original_url. Without this second
+    # index a redirecting sitemap URL looked uncrawled and was reported as
+    # "in sitemap, not crawled" instead of as a redirect.
+    redirected_from = {}
     for r in results:
         u = r.get('url')
         if not u:
             continue
         crawl_by_norm[_norm_url(u)] = r
+        ou = r.get('original_url')
+        if ou and _norm_url(ou) != _norm_url(u):
+            redirected_from.setdefault(_norm_url(ou), r)
 
     sitemap_by_norm = {}
     for entry in sm_urls:
@@ -3179,7 +3187,7 @@ def sitemap_analyse():
         original_url = entry['url']
         if pag_re.search(urlparse(original_url).path) or pag_re.search('?' + (urlparse(original_url).query or '')):
             pagination_in_sitemap.append(original_url)
-        crawled = crawl_by_norm.get(nrm) or canonical_to_row.get(nrm)
+        crawled = crawl_by_norm.get(nrm) or redirected_from.get(nrm) or canonical_to_row.get(nrm)
         if crawled is None:
             sitemap_only.append({'url': original_url, 'lastmod': entry.get('lastmod')})
             continue

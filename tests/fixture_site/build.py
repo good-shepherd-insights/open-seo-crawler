@@ -204,8 +204,25 @@ def build(base='http://127.0.0.1:8099'):
     write('/big/', page(body,
                         head=f'<title>A very large document</title><meta name="description" content="An HTML document deliberately larger than two megabytes, past the point Google stops reading one.">{canonical(base + "/big/")}'))
 
+    # A page only the sitemap knows about, for the sitemap-only report.
+    write('/sitemap-only/', page(
+        f'{NAV}<h1>Only in the sitemap</h1><p>' + ('Copy here. ' * 40) + '</p>',
+        head=f'<title>Only in the sitemap</title><meta name="description" content="A page listed in the XML sitemap that no page on the site links to, for the sitemap-only report.">{canonical(base + "/sitemap-only/")}'))
+
+    # The sitemap lists the clean core pages plus one of each sitemap fault: a
+    # 404, a redirect, a noindex page and a page nothing links to. Crawled pages
+    # it leaves out (the clean second page, say) belong in "missing from sitemap".
+    listed = ['/', '/about/', '/services/', '/gone/', '/old-url/',
+              '/noindex-target/', '/sitemap-only/']
+    with open(os.path.join(OUT, 'sitemap.xml'), 'w', encoding='utf-8') as fh:
+        fh.write('<?xml version="1.0" encoding="UTF-8"?>\n'
+                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                 + ''.join(f'  <url><loc>{base}{p}</loc><lastmod>2026-10-01</lastmod></url>\n'
+                           for p in listed)
+                 + '</urlset>\n')
+
     with open(os.path.join(OUT, 'robots.txt'), 'w', encoding='utf-8') as fh:
-        fh.write('User-agent: *\nAllow: /\n')
+        fh.write(f'User-agent: *\nAllow: /\nSitemap: {base}/sitemap.xml\n')
 
     return OUT
 
