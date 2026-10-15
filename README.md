@@ -1,10 +1,12 @@
-# Open SEO Crawler: Free SEO Crawler & Website Audit Tool (Self-Hosted)
+# Open SEO Crawler: Free SEO Crawler, Website Audit & AI Crawler Checker (Self-Hosted)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Platform: Linux · macOS · Windows](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)](#one-line-install-auto-start--auto-update-linux--macos--windows)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
 **Open SEO Crawler is a free, open-source SEO crawler you run locally**: a self-hosted website SEO crawler and site audit tool that crawls any website for technical SEO issues. Fast, concurrent, and CMS-aware, it's a drop-in alternative to Screaming Frog, Sitebulb, and Ahrefs Site Audit, with no accounts, no API keys, no cloud, and no per-URL limits.
+
+**It is also an AI crawler checker.** Can AI search and Google read your pages? After each crawl, a sample of pages is requested as Googlebot, Bingbot, Applebot and every AI crawler that publishes its user agent (GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, CCBot). A page that a crawler is blocked from, challenged on, redirected away from or served a thinner version of gets flagged, and so does text that only appears after JavaScript runs. When the crawl is done, the **AI brief** button packs it into a summary and a ready-made prompt you can paste into any AI assistant.
 
 Built for SEO professionals, web developers, and site owners who want a real technical SEO audit that stays on their machine. Use it as a free SEO crawler for a single site or a recurring website crawler across your whole portfolio.
 
@@ -38,17 +40,17 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
 
 ## What's new (recent additions)
 
-- **Bot readability check**: after every crawl, a sample of pages is requested as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents (OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot, CCBot). Blocks, CDN challenges, redirects, a different title or text, a thinner page or a noindex aimed at one crawler are flagged, as is content that only exists after JavaScript runs and a mobile page with less content than desktop. On by default for 10 pages.
+- **AI crawler checker (bot readability)**: after every crawl, a sample of pages is requested as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents (OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot, CCBot). Blocks, CDN challenges, redirects, a different title or text, a thinner page or a noindex aimed at one crawler are flagged, as is content that only exists after JavaScript runs and a mobile page with less content than desktop. On by default for 10 pages.
 - **AI brief**: one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
 - **Every report exports**: Export view now works on every report tab (All Titles, Redirect Chains, Hreflang, Deep Pages and the rest), and the .xlsx workbook adds a sheet for each report that has rows.
 - **Safer and steadier**: crawled titles, URLs and robots.txt lines can no longer run script inside the app, other websites can no longer trigger Update or Restart, the Update button restarts cleanly under systemd and launchd, and sitemap analysis works again.
 - **Malformed link href detection**: a scheme-less `href` containing a raw space (a street address or Google Maps Plus Code pasted straight into a link, e.g. `<a href="7FG4+8Q Springfield">Directions</a>`) used to resolve relative to every page carrying it and flood the crawl with phantom 404s. One broken footer link on a 300-page site meant ~300 fake 404 rows. Now it's skipped as a link and reported once per page as a **Malformed link href** issue naming the offending text.
-- **JS vs no-JS compare mode**: with Render JS on, tick *Compare with non-JS HTML* to crawl every page in BOTH modes (Playwright-rendered and raw HTML). The per-page diff shows exactly which content is invisible to AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended), which mostly don't execute JavaScript.
+- **JS vs no-JS compare mode**: with Render JS on, tick *Compare with non-JS HTML* to crawl every page in BOTH modes (Playwright-rendered and raw HTML). The per-page diff shows exactly which content is invisible to AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot), which mostly don't execute JavaScript.
 - **Shared-instance support**: point the saved-crawls list at extra folders (`SITE_CRAWLER_EXTRA_CRAWL_DIRS`) so one office instance shows crawls from multiple tools, and label who ran each crawl by IP (`SITE_CRAWLER_USER_MAP`).
 - **Crawl Budget page**: scans the homepage + section pages, buckets every discovered URL by query parameter, classifies crawl-budget traps (Elementor `?e-page-` AJAX pagination, faceted filters, sort / tracking / session params) and generates ready-to-paste robots.txt `Disallow` rules. Shows the sitemap's real page count next to the phantom parameter URLs so the wasted crawl budget is obvious.
 - **Soft-404 / infinite-URL-trap detection**: after every crawl, two probe requests check whether the server returns 200 for URLs that cannot exist (`/<token>/` at the root, and nested under a real page). A 200 means the server soft-404s and mints an infinite crawlable URL space; flagged red in the issues sidebar with fix guidance.
 - **Images Missing Alt report**: an image-centric bulk report with one row per image missing alt text and every page that embeds it.
-- **robots.txt AI-crawler block detection**: flags, as a red error, when robots.txt blocks AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot, Bytespider + 20 more), meaning the site can't be read or cited by ChatGPT, AI, Perplexity or Google AI Overviews, or when classic search engines (Googlebot/Bingbot) are blocked. Also detects Cloudflare `Content-Signal: ai-train=no` opt-outs. Surfaces on the homepage row in the issues sidebar under **AI Crawlers Blocked** / **Search Engines Blocked**.
+- **robots.txt AI-crawler block detection**: flags, as a red error, when robots.txt blocks AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot, Bytespider + 20 more), meaning the site can't be read or cited by ChatGPT, Perplexity or Google AI Overviews, or when classic search engines (Googlebot/Bingbot) are blocked. Also detects Cloudflare `Content-Signal: ai-train=no` opt-outs. Surfaces on the homepage row in the issues sidebar under **AI Crawlers Blocked** / **Search Engines Blocked**.
 - **Post-crawl Summary dashboard**: auto-opens after a crawl finishes with a one-glance view of issues by severity, total pages, response code mix, and the worst offenders.
 - **Bulk SEO reports**: All Titles, All Metas, All H1s, All Canonicals, plus dedicated Duplicate Title / Duplicate Meta / Duplicate H1 / Duplicate Body / Multiple H1s / Redirect Chains / Response Codes / Deep Pages / Hreflang reports.
 - **Severity-grouped issues view**: pages are bucketed by the worst issue on them (Errors / Warnings / Info) and grouped by issue type so you fix the highest-impact problems first.
@@ -77,7 +79,7 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
   - Plain text pasted into `href` (addresses, Google Maps Plus Codes) reported as a **Malformed link href** issue instead of spawning a phantom 404 under every page
   - Post-crawl soft-404 probes detect servers that return 200 for URLs that cannot exist
 
-### Bot readability (search and AI crawlers)
+### AI crawler checker (bot readability)
 
 Googlebot, Bingbot and Applebot render JavaScript; most AI crawlers do not say they do, so they read the HTML as served. After each crawl (tick box, on by default) a sample of pages, the home page plus one page from each section, is requested as a browser and as each crawler below, then compared.
 
