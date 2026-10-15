@@ -33,6 +33,22 @@ import page_checks   # extra per-page crawler checks (pure, offline-testable)
 app = Flask(__name__, static_folder='static', template_folder='templates')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
 
+
+@app.before_request
+def _refuse_cross_site_writes():
+    """Refuse state-changing requests a browser sent from another site.
+
+    The app has no login and listens on the LAN, and its POST routes pull
+    code, restart the process, start crawls and delete saved crawls. Any web
+    page the user has open could post to them: /update and /restart take no
+    body, so a plain form post reaches them with no CORS preflight. Browsers
+    label such requests (Sec-Fetch-Site, Origin), so anything not from this
+    app's own pages is refused. Scripts and curl send neither header and are
+    unaffected, and so are teammates opening the app by its LAN address.
+    """
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return None
+
 # crawl_id -> {'include': [patterns], 'exclude': [patterns]}. Workers read on
 # every URL so the Apply button can mutate rules mid-crawl. Replace list refs
 # atomically (do not mutate in place) so concurrent readers see a consistent
@@ -4454,7 +4470,6 @@ def crawl_site():
         headers={
             'Cache-Control': 'no-cache',
             'X-Accel-Buffering': 'no',
-            'Access-Control-Allow-Origin': '*'
         }
     )
 
