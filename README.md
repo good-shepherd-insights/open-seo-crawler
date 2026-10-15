@@ -1,4 +1,4 @@
-# Open SEO Crawler — Free SEO Crawler & Website Audit Tool (Self-Hosted)
+# Open SEO Crawler: Free SEO Crawler & Website Audit Tool (Self-Hosted)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Platform: Linux · macOS · Windows](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)](#one-line-install--auto-start--auto-update-linux--macos--windows)
@@ -24,6 +24,17 @@ Built by [Puneet Singh](https://au.linkedin.com/in/puneet-singh0), a working SEO
 | Open source | ✅ | ❌ | ❌ | ❌ | ❌ |
 | CMS-aware presets | ✅ 10 CMSs | ❌ | partial | partial | partial |
 | Headless JS render | ✅ optional | ✅ paid | ✅ | ✅ | ✅ |
+
+## Companion: SEO Side Panel for Chrome
+
+The crawler covers a whole site. For the one page you have open, there is [SEO Side Panel](https://chromewebstore.google.com/detail/seo-side-panel/npjfeaapfebfgkmcbikigoigojfhcbho), a free Chrome extension from the same maker. It stays open beside every page you visit and lists each issue with its fix.
+
+- **What AI crawlers miss.** The raw HTML the server sends, next to the rendered page. GPTBot, ClaudeBot and PerplexityBot do not run JavaScript, so anything that only appears after hydration is invisible to them.
+- **Titles and meta descriptions measured in pixels,** not characters.
+- **JSON-LD errors named by block and line,** in plain words.
+- **Link status:** every link on the page marked 200, redirect or 404.
+
+No account, no API key, no telemetry. Crawl the site here to find the pages with problems, then open one in Chrome to see what is wrong with it.
 
 ## What's new (recent additions)
 
@@ -387,6 +398,9 @@ Yes. It auto-detects 10 CMS platforms (Shopify, WordPress + Yoast / Rank Math, W
 
 **Is it really free and open source?**
 Yes — MIT licensed and self-hosted, running entirely on your machine. No telemetry, no phone-home, no per-URL billing.
+
+**Is there a Chrome extension for checking a single page?**
+Yes: [SEO Side Panel](https://chromewebstore.google.com/detail/seo-side-panel/npjfeaapfebfgkmcbikigoigojfhcbho), free and from the same maker. The crawler audits the whole site from your machine. The extension checks the page you are on, in a panel beside it, including what AI crawlers can and cannot read.
 
 ## Related search terms
 

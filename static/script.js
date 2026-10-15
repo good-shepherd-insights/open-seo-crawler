@@ -583,6 +583,38 @@ window.dockSwitchTab = function(tab) {
   document.querySelectorAll('.dock-pane').forEach(p => p.style.display = p.dataset.tab === tab ? '' : 'none');
 };
 
+// One quiet line along the foot of the dock pointing at SEO Side Panel, the
+// free Chrome extension from the same maker: the crawler sees the whole site,
+// the extension looks at one page live. Plain links only, so nothing is
+// requested until someone clicks, and once hidden it stays hidden.
+const _SC_TIP_KEY = 'sc_hide_side_panel_tip';
+const _SC_SIDE_PANEL_URL = 'https://chromewebstore.google.com/detail/seo-side-panel/npjfeaapfebfgkmcbikigoigojfhcbho';
+function _scSidePanelTip() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(_SC_TIP_KEY) === '1'; } catch {}
+  let tip = document.getElementById('dock-tip');
+  if (hidden) { if (tip) tip.remove(); return; }
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'dock-tip';
+    tip.className = 'dock-tip';
+    tip.innerHTML = `
+      <svg class="dock-tip-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
+      <span class="dock-tip-text"><strong>See this page live.</strong> SEO Side Panel, a free Chrome extension from the same maker, shows what AI crawlers can read and every issue with its fix.</span>
+      <a class="dock-tip-link" id="dock-tip-open" target="_blank" rel="noopener">Open page ↗</a>
+      <a class="dock-tip-link" href="${_SC_SIDE_PANEL_URL}" target="_blank" rel="noopener">Chrome Web Store ↗</a>
+      <button class="dock-tip-close" type="button" onclick="hideSidePanelTip()" title="Hide this tip" aria-label="Hide this tip">✕</button>`;
+    document.getElementById('crawler-dock').appendChild(tip);
+  }
+  // Set as a property, not spliced into markup, so the URL never needs escaping.
+  tip.querySelector('#dock-tip-open').href = dockUrl;
+}
+window.hideSidePanelTip = function() {
+  try { localStorage.setItem(_SC_TIP_KEY, '1'); } catch {}
+  const tip = document.getElementById('dock-tip');
+  if (tip) tip.remove();
+};
+
 function renderDock() {
   if (!dockUrl) return;
   const page = crawlerResults.find(r => r.url === dockUrl) || {};
@@ -675,6 +707,8 @@ function renderDock() {
         </div>`;
       }).join('')
     : '<div class="empty">No outbound links recorded.</div>';
+
+  _scSidePanelTip();
 }
 
 // =============================================================================
@@ -4063,7 +4097,7 @@ async function exportCrawlerView() {
       return;
     }
     const csv = [built.header, ...built.rows].map(r => r.map(_scCsvCell).join(',')).join('\r\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     const slug = (cat || 'view').replace(/^_+/, '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'view';
