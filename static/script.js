@@ -799,6 +799,7 @@ let crawlerLastCrawlId = null;
 // its own arrived, and a loaded crawl kept the old site's sitemap tabs.
 function _scResetPerCrawlState() {
   window.crawlerReports = null;
+  _scBotGen++;
   if (typeof crawlerSitemap !== 'undefined') crawlerSitemap = null;
   window.sitemapAnalysisSkipped = false;
   window._ndPairs = [];
@@ -4739,7 +4740,12 @@ const _SC_BOT_STATE = {
   error:      { sym: '?', cls: 'muted', text: 'No response' },
 };
 const _SC_BOT_KIND = { search: 'Search', 'ai-search': 'AI search', 'ai-assistant': 'AI assistant', training: 'Training', baseline: 'Baseline' };
-let _scBotRunning = false;
+// Bumped when a crawl starts or a saved crawl loads (_scResetPerCrawlState),
+// so a check still running for the previous crawl cannot write its findings
+// into the new one or block the new crawl's own check.
+let _scBotGen = 0;
+let _scBotRunningGen = -1;
+function _scBotIsRunning() { return _scBotRunningGen === _scBotGen; }
 
 function _scBotStatus(text) {
   const el = document.getElementById('bots-status');
@@ -4749,9 +4755,9 @@ function _scBotStatus(text) {
 }
 
 // Swap in this report's findings, removing the previous run's first.
-function _scMergeBotIssues(report) {
+function _scMergeBotIssues(report, rows) {
   const add = (report && report.page_issues) || {};
-  for (const r of (crawlerResults || [])) {
+  for (const r of (rows || crawlerResults || [])) {
     if (Array.isArray(r._bot_issues) && r._bot_issues.length) {
       r.issues = (r.issues || []).filter(i => !r._bot_issues.includes(i));
     }
@@ -4765,10 +4771,23 @@ function _scMergeBotIssues(report) {
   }
 }
 
-async function runBotCheck() {
-  if (_scBotRunning) return;
+// The running check, so a second call (the Run again button, or the
+// auto-save waiting on it) gets the same promise instead of a no-op.
+let _scBotPromise = null;
+function runBotCheck() {
+  if (_scBotIsRunning()) return _scBotPromise || Promise.resolve();
+  _scBotPromise = _scRunBotCheck();
+  return _scBotPromise;
+}
+
+async function _scRunBotCheck() {
+  if (_scBotIsRunning()) return;
   if (!Array.isArray(crawlerResults) || !crawlerResults.length) return;
-  _scBotRunning = true;
+  const gen = _scBotGen;
+  const results = crawlerResults;
+  window.crawlerReports = window.crawlerReports || {};
+  const reports = window.crawlerReports;
+  _scBotRunningGen = gen;
   const sizeEl = document.getElementById('crawler-bots-sample');
   const sample = Math.max(1, Math.min(parseInt((sizeEl && sizeEl.value) || '10', 10) || 10, 100));
   const speed = document.getElementById('crawler-speed');
@@ -4810,9 +4829,11 @@ async function runBotCheck() {
       }
     }
     if (!report) throw new Error('no report came back');
-    window.crawlerReports = window.crawlerReports || {};
-    window.crawlerReports.bot_check = report;
-    _scMergeBotIssues(report);
+    // Stored on this crawl's own objects, so a crawl started meanwhile is
+    // left alone and the auto-save of this crawl still carries the findings.
+    reports.bot_check = report;
+    _scMergeBotIssues(report, results);
+    if (gen !== _scBotGen) return;
     _scBotStatus('');
     if (typeof updateCounts === 'function') updateCounts();
     const flagged = Object.keys(report.page_issues || {}).length;
@@ -4820,11 +4841,12 @@ async function runBotCheck() {
       ? `Bot check: ${flagged} of ${report.sample.length} sample pages need a look`
       : `Bot check: all ${report.sample.length} sample pages read the same for every crawler`, flagged ? 'warn' : 'success');
   } catch (e) {
+    if (gen !== _scBotGen) return;
     _scBotStatus('');
     showToast(`Bot check failed: ${e.message || e}`, 'error');
   } finally {
-    _scBotRunning = false;
-    if (activeCategory === '__bots') _scRenderBotsPanel();
+    if (_scBotRunningGen === gen) _scBotRunningGen = -1;
+    if (gen === _scBotGen && activeCategory === '__bots') _scRenderBotsPanel();
   }
 }
 
@@ -4847,7 +4869,7 @@ function _scRenderBotsPanel() {
   panel.id = 'bots-panel';
   panel.className = 'bots-panel';
   const report = (window.crawlerReports || {}).bot_check;
-  const runBtn = `<button type="button" class="ai-btn" onclick="runBotCheck()" ${_scBotRunning ? 'disabled' : ''}>${_scBotRunning ? 'Checking…' : (report ? 'Run again' : 'Run bot check')}</button>`;
+  const runBtn = `<button type="button" class="ai-btn" onclick="runBotCheck()" ${_scBotIsRunning() ? 'disabled' : ''}>${_scBotIsRunning() ? 'Checking…' : (report ? 'Run again' : 'Run bot check')}</button>`;
   const caveat = `<p class="bots-caveat">Requests are sent from this machine with each crawler's user agent. CDNs and firewalls recognise the real crawlers by IP address or signature, so a block, a challenge or a clean pass here can differ from what the real crawler gets, in either direction. Treat a problem as a lead to check in your CDN or firewall settings. For Google, confirm with the URL Inspection live test in Search Console. Use on sites you own or audit.</p>`;
   if (!report) {
     panel.innerHTML = `<div class="bots-head"><div><h3>Bot readability</h3>
@@ -4971,7 +4993,9 @@ function crawlFinished() {
     // Bot readability check, on by default.
     const _botCheckbox = document.getElementById('crawler-run-bots');
     if (_botCheckbox && _botCheckbox.checked) {
-      setTimeout(() => { runBotCheck(); }, 2500);
+      window._scPostCrawlBotCheck = new Promise(res => setTimeout(() => { runBotCheck().then(res, res); }, 2500));
+    } else {
+      window._scPostCrawlBotCheck = null;
     }
   }
 }
@@ -6133,8 +6157,14 @@ window._compareToggleIssueDrill = function(idx) {
     if (!Array.isArray(crawlerResults) || !crawlerResults.length) return;
     const post = document.getElementById('crawler-post-crawl-actions');
     if (post) post.style.display = 'flex';
+    // Wait for the bot check (up to 5 minutes) so the saved crawl carries its
+    // findings, and save this crawl's own objects, so a crawl started in the
+    // meantime is not what gets saved.
+    const results = crawlerResults, inlinks = crawlerInlinks, reports = window.crawlerReports || {};
+    const wait = window._scPostCrawlBotCheck || Promise.resolve();
+    Promise.race([wait, new Promise(r => setTimeout(r, 300000))]).then(() => {
     try {
-      const host = (crawlerResults[0].url || '').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+      const host = (results[0].url || '').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
       const d = new Date();
       const stamp = d.getFullYear() + '-' +
         String(d.getMonth()+1).padStart(2,'0') + '-' +
@@ -6145,11 +6175,12 @@ window._compareToggleIssueDrill = function(idx) {
       fetch('/crawl/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, results: crawlerResults, inlinks: crawlerInlinks, reports: window.crawlerReports || {} })
+        body: JSON.stringify({ name, results, inlinks, reports })
       }).then(r => r.json()).then(d => {
         if (d && d.ok) showToast(`Auto-saved: ${name}`, 'success');
       }).catch(() => {});
     } catch {}
+    });
   };
 })();
 

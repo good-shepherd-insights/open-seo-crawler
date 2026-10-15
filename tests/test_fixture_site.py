@@ -321,6 +321,16 @@ check('mobile parity: a thin mobile page is reported',
 check('robots.txt: CCBot is disallowed on the bot pages only',
       ((bots.get('pages') or {}).get(BASE + '/bot-blocked/') or {}).get('robots', {}).get('ccbot') is False
       and ((bots.get('pages') or {}).get(BASE + '/about/') or {}).get('robots', {}).get('ccbot') is True)
+# The sample keeps a start page the crawl reached through a redirect (the row is
+# stored under the URL it landed on) and skips a row whose own URL redirects.
+_rows = [{'url': BASE + '/', 'status_code': 200, 'depth': 0, 'content_type': 'text/html',
+          'redirect_url': BASE + '/', 'original_url': 'http://localhost:1/'},
+         {'url': BASE + '/about/', 'status_code': 200, 'depth': 1, 'content_type': 'text/html'},
+         {'url': BASE + '/old-url/', 'status_code': 200, 'depth': 1, 'content_type': 'text/html',
+          'redirect_url': BASE + '/redirect-target/'}]
+_pick = crawler._bot_sample(_rows, 10)
+check('the bot sample keeps a start page reached through a redirect', _pick[:1] == [BASE + '/'])
+check('the bot sample skips a row whose own URL redirects elsewhere', BASE + '/old-url/' not in _pick)
 check('crawlers without a published user agent are robots.txt only',
       any(a['id'] == 'claudebot' and not a['live'] for a in bots.get('agents', [])))
 if bots.get('rendered'):

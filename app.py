@@ -3760,7 +3760,13 @@ def _bot_sample(results, n=10):
     for r in results or []:
         u = r.get('url') or ''
         ctype = (r.get('content_type') or 'text/html').lower()
-        if (not _HAS_SCHEME_RE.match(u) or (r.get('status_code') or 0) != 200 or r.get('redirect_url')
+        # A row the crawler followed through a redirect is stored under the
+        # URL it landed on (the start page, when the typed URL redirects to
+        # https or www), so it is a normal page here. Only a row whose own URL
+        # sends the request elsewhere is skipped.
+        redir = r.get('redirect_url')
+        if (not _HAS_SCHEME_RE.match(u) or (r.get('status_code') or 0) != 200
+                or (redir and _norm_url(redir) != _norm_url(u))
                 or r.get('indexable') is False or 'html' not in ctype
                 or r.get('canonical_kind') == 'canonicalised'):
             continue
