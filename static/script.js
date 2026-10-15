@@ -46,33 +46,33 @@ let activeCategory = 'all';
 // Per-category metadata: severity, explanation, cited sources.
 // Shown in the info box above the table when a category is clicked.
 const ISSUE_META = {
-  'AI crawlers blocked': { sev: 'error', why: 'robots.txt is blocking AI answer-engine crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended and similar). These bots feed ChatGPT, Claude, Perplexity and Google AI Overviews — when they\'re blocked the site cannot be read, cited, or summarised in any AI answer. Often a CDN "Block AI bots" default rather than a deliberate decision — confirm intent, then unblock the search/citation bots (OAI-SearchBot, Claude-SearchBot, PerplexityBot, ChatGPT-User) if AI visibility is wanted.', sources: [['Cloudflare — Manage AI crawlers', 'https://developers.cloudflare.com/bots/concepts/bot/ai-bots/'], ['OpenAI — GPTBot', 'https://platform.openai.com/docs/bots'], ['Google — Google-Extended', 'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers']] },
-  'AI training bots blocked': { sev: 'info', why: 'robots.txt blocks training/data-collection-only crawlers (CCBot, Bytespider, Applebot-Extended and similar). These bots harvest content for model training or resale — they do not feed live AI answers, so blocking them does not affect visibility in ChatGPT, Claude, Perplexity or Google AI Overviews. Usually a deliberate content-protection choice; no action needed unless inclusion in training corpora is wanted.', sources: [['Cloudflare — Manage AI crawlers', 'https://developers.cloudflare.com/bots/concepts/bot/ai-bots/'], ['Common Crawl — CCBot', 'https://commoncrawl.org/ccbot']] },
-  'Search engines blocked': { sev: 'error', why: 'robots.txt is disallowing a classic search crawler (Googlebot / Bingbot) or applies Disallow: / to all bots. This removes the site from normal search results entirely. Almost always a mistake — most often a staging Disallow: / rule left in place after launch. Fix immediately.', sources: [['Google — robots.txt intro', 'https://developers.google.com/search/docs/crawling-indexing/robots/intro']] },
-  'Missing meta description': { sev: 'error', why: 'Google falls back to scraping body copy for the SERP snippet — almost always worse CTR than a hand-written description.', sources: [['Ahrefs — Meta Description', 'https://ahrefs.com/blog/meta-description/'], ['Moz — Meta Description', 'https://moz.com/learn/seo/meta-description']] },
-  'Meta desc too long': { sev: 'warn', why: 'Google truncates around 155–160 characters on desktop, shorter on mobile. Past that gets ellipsised.', sources: [['Moz — Meta Description', 'https://moz.com/learn/seo/meta-description'], ['Ahrefs — Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
-  'Meta desc too short': { sev: 'warn', why: 'Under ~120 characters wastes SERP real estate and gives Google less to match against queries.', sources: [['Ahrefs — Meta Description', 'https://ahrefs.com/blog/meta-description/'], ['Moz — Meta Description', 'https://moz.com/learn/seo/meta-description']] },
-  'Missing title': { sev: 'error', why: 'The <title> is the strongest on-page ranking signal and the clickable SERP heading. Missing means Google invents one — usually badly.', sources: [['Moz — Title Tag', 'https://moz.com/learn/seo/title-tag'], ['Ahrefs — Title Tag', 'https://ahrefs.com/blog/title-tag/']] },
-  'Title too long': { sev: 'warn', why: 'Google truncates titles at ~600 px (≈60 chars). Lead with the primary keyword, put brand last.', sources: [['Moz — Title Tag', 'https://moz.com/learn/seo/title-tag'], ['Ahrefs — Title Tag', 'https://ahrefs.com/blog/title-tag/']] },
-  'Title too short': { sev: 'warn', why: 'Titles under ~30 chars under-use SERP real estate and miss supporting keywords.', sources: [['Moz — Title Tag', 'https://moz.com/learn/seo/title-tag']] },
-  'Missing H1': { sev: 'error', why: 'The H1 tells users and search engines what the page is about. Missing H1s hurt accessibility (screen readers) and topical relevance.', sources: [['Ahrefs — H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
-  'Multiple H1s': { sev: 'warn', why: 'Dilutes topical signal and usually indicates a template issue. One clear H1 per page is the safe pattern.', sources: [['Ahrefs — H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
-  'H1 same as title': { sev: 'warn', why: 'Title and H1 serve different jobs — title is for SERP CTR (≤60 chars, keyword-first), H1 is for on-page clarity. Identical text wastes a chance to target a second keyword angle.', sources: [['Ahrefs — H1 Tag', 'https://ahrefs.com/blog/h1-tag/'], ['Moz — Title Tag', 'https://moz.com/learn/seo/title-tag']] },
-  'Missing canonical': { sev: 'error', why: 'Without a canonical, Google has to guess which URL variant to index. Picks non-deterministically and splits link equity.', sources: [['Ahrefs — Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/'], ['Moz — Canonicalization', 'https://moz.com/learn/seo/canonicalization']] },
-  'Canonicalised': { sev: 'warn', why: 'The canonical points elsewhere, so Google will drop this URL from the index and keep the canonical target instead.', sources: [['Ahrefs — Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/'], ['Moz — Canonicalization', 'https://moz.com/learn/seo/canonicalization']] },
-  'imgs missing alt': { sev: 'warn', why: 'Alt text is required for accessibility and is how Google Images + AI engines understand visuals.', sources: [['Ahrefs — Image Alt Text', 'https://ahrefs.com/blog/image-alt-text/'], ['Moz — Alt Text', 'https://moz.com/learn/seo/alt-text']] },
-  'No schema': { sev: 'warn', why: 'Without JSON-LD, Google can\'t award rich results and AI engines have to parse HTML to figure out entity/relationship signals.', sources: [['Ahrefs — Schema Markup', 'https://ahrefs.com/blog/schema-markup/'], ['Moz — Schema', 'https://moz.com/learn/seo/schema-structured-data']] },
-  'Thin content': { sev: 'warn', why: 'Pages under ~200 words rarely rank because they fail to cover intent. Google\'s Helpful Content system penalises pages that don\'t satisfy the query.', sources: [['Ahrefs — Thin Content', 'https://ahrefs.com/blog/thin-content/']] },
-  'Slow': { sev: 'warn', why: 'Response time over 3s degrades Core Web Vitals (LCP, INP) and increases bounce. Field LCP ≤2.5s is Google\'s "good" threshold.', sources: [['Ahrefs — Page Speed', 'https://ahrefs.com/blog/page-speed/'], ['Moz — Page Speed', 'https://moz.com/learn/seo/page-speed']] },
-  'Redirect': { sev: 'warn', why: 'Real content redirects mean inbound links hit stale URLs. Update internal links to the final destination to preserve crawl budget and link equity.', sources: [['Ahrefs — 301 Redirects', 'https://ahrefs.com/blog/301-redirects/'], ['Moz — Redirection', 'https://moz.com/learn/seo/redirection']] },
-  'noindex': { sev: 'error', why: 'The page is explicitly telling Google not to index it. Intentional for staging; catastrophic on money pages.', sources: [['Ahrefs — Noindex', 'https://ahrefs.com/blog/noindex/']] },
-  'HTTP': { sev: 'error', why: 'A 4xx/5xx response means users and Googlebot hit an error page. 404s on indexed URLs bleed link equity.', sources: [['Ahrefs — HTTP Status Codes', 'https://ahrefs.com/blog/http-status-codes/'], ['Moz — HTTP Status Codes', 'https://moz.com/learn/seo/http-status-codes']] },
-  'Missing viewport': { sev: 'warn', why: 'Without viewport meta, mobile browsers render at desktop width. Google flags the page as not mobile-friendly.', sources: [['Ahrefs — Mobile SEO', 'https://ahrefs.com/blog/mobile-seo/'], ['Moz — Mobile Optimization', 'https://moz.com/learn/seo/mobile-optimization']] },
-  'URL:': { sev: 'warn', why: 'URL hygiene issues (uppercase, underscores, spaces, >115 chars, tracking params) create duplicate-URL risk and hurt CTR.', sources: [['Ahrefs — URL Structure', 'https://ahrefs.com/blog/url-structure/'], ['Moz — URL', 'https://moz.com/learn/seo/url']] },
-  'Mixed content': { sev: 'error', why: 'HTTPS pages loading HTTP resources break the padlock and modern browsers block active mixed content.', sources: [['Ahrefs — HTTPS Migration', 'https://ahrefs.com/blog/https-migration/']] },
-  'Missing Open Graph': { sev: 'warn', why: 'Without og:title/og:description/og:image, Facebook/LinkedIn/Slack previews scrape random page elements. Shares look ugly, CTR drops.', sources: [['Ahrefs — Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
-  'Missing og:image': { sev: 'warn', why: 'Without an og:image, shared links render as text-only cards — significantly lower engagement. Recommended size: 1200×630.', sources: [['Ahrefs — Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
-  'Missing Twitter Card': { sev: 'info', why: 'Without twitter:card metadata, X falls back to Open Graph or plain text. Summary Large Image card gives the best preview.', sources: [['Ahrefs — Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
+  'AI crawlers blocked': { sev: 'error', why: 'robots.txt is blocking AI answer-engine crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended and similar). These bots feed ChatGPT, Claude, Perplexity and Google AI Overviews, when they\'re blocked the site cannot be read, cited, or summarised in any AI answer. Often a CDN "Block AI bots" default rather than a deliberate decision, confirm intent, then unblock the search/citation bots (OAI-SearchBot, Claude-SearchBot, PerplexityBot, ChatGPT-User) if AI visibility is wanted.', sources: [['Cloudflare: Manage AI crawlers', 'https://developers.cloudflare.com/bots/concepts/bot/ai-bots/'], ['OpenAI: GPTBot', 'https://platform.openai.com/docs/bots'], ['Google: Google-Extended', 'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers']] },
+  'AI training bots blocked': { sev: 'info', why: 'robots.txt blocks training/data-collection-only crawlers (CCBot, Bytespider, Applebot-Extended and similar). These bots harvest content for model training or resale, they do not feed live AI answers, so blocking them does not affect visibility in ChatGPT, Claude, Perplexity or Google AI Overviews. Usually a deliberate content-protection choice; no action needed unless inclusion in training corpora is wanted.', sources: [['Cloudflare: Manage AI crawlers', 'https://developers.cloudflare.com/bots/concepts/bot/ai-bots/'], ['Common Crawl: CCBot', 'https://commoncrawl.org/ccbot']] },
+  'Search engines blocked': { sev: 'error', why: 'robots.txt is disallowing a classic search crawler (Googlebot / Bingbot) or applies Disallow: / to all bots. This removes the site from normal search results entirely. Almost always a mistake: most often a staging Disallow: / rule left in place after launch. Fix immediately.', sources: [['Google: robots.txt intro', 'https://developers.google.com/search/docs/crawling-indexing/robots/intro']] },
+  'Missing meta description': { sev: 'error', why: 'Google falls back to scraping body copy for the SERP snippet, almost always worse CTR than a hand-written description.', sources: [['Ahrefs: Meta Description', 'https://ahrefs.com/blog/meta-description/'], ['Moz: Meta Description', 'https://moz.com/learn/seo/meta-description']] },
+  'Meta desc too long': { sev: 'warn', why: 'Google truncates around 155-160 characters on desktop, shorter on mobile. Past that gets ellipsised.', sources: [['Moz: Meta Description', 'https://moz.com/learn/seo/meta-description'], ['Ahrefs: Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
+  'Meta desc too short': { sev: 'warn', why: 'Under ~120 characters wastes SERP real estate and gives Google less to match against queries.', sources: [['Ahrefs: Meta Description', 'https://ahrefs.com/blog/meta-description/'], ['Moz: Meta Description', 'https://moz.com/learn/seo/meta-description']] },
+  'Missing title': { sev: 'error', why: 'The <title> is the strongest on-page ranking signal and the clickable SERP heading. Missing means Google invents one, usually badly.', sources: [['Moz: Title Tag', 'https://moz.com/learn/seo/title-tag'], ['Ahrefs: Title Tag', 'https://ahrefs.com/blog/title-tag/']] },
+  'Title too long': { sev: 'warn', why: 'Google truncates titles at ~600 px (≈60 chars). Lead with the primary keyword, put brand last.', sources: [['Moz: Title Tag', 'https://moz.com/learn/seo/title-tag'], ['Ahrefs: Title Tag', 'https://ahrefs.com/blog/title-tag/']] },
+  'Title too short': { sev: 'warn', why: 'Titles under ~30 chars under-use SERP real estate and miss supporting keywords.', sources: [['Moz: Title Tag', 'https://moz.com/learn/seo/title-tag']] },
+  'Missing H1': { sev: 'error', why: 'The H1 tells users and search engines what the page is about. Missing H1s hurt accessibility (screen readers) and topical relevance.', sources: [['Ahrefs: H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
+  'Multiple H1s': { sev: 'warn', why: 'Dilutes topical signal and usually indicates a template issue. One clear H1 per page is the safe pattern.', sources: [['Ahrefs: H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
+  'H1 same as title': { sev: 'warn', why: 'Title and H1 serve different jobs: title is for SERP CTR (≤60 chars, keyword-first), H1 is for on-page clarity. Identical text wastes a chance to target a second keyword angle.', sources: [['Ahrefs: H1 Tag', 'https://ahrefs.com/blog/h1-tag/'], ['Moz: Title Tag', 'https://moz.com/learn/seo/title-tag']] },
+  'Missing canonical': { sev: 'error', why: 'Without a canonical, Google has to guess which URL variant to index. Picks non-deterministically and splits link equity.', sources: [['Ahrefs: Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/'], ['Moz: Canonicalization', 'https://moz.com/learn/seo/canonicalization']] },
+  'Canonicalised': { sev: 'warn', why: 'The canonical points elsewhere, so Google will drop this URL from the index and keep the canonical target instead.', sources: [['Ahrefs: Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/'], ['Moz: Canonicalization', 'https://moz.com/learn/seo/canonicalization']] },
+  'imgs missing alt': { sev: 'warn', why: 'Alt text is required for accessibility and is how Google Images + AI engines understand visuals.', sources: [['Ahrefs: Image Alt Text', 'https://ahrefs.com/blog/image-alt-text/'], ['Moz: Alt Text', 'https://moz.com/learn/seo/alt-text']] },
+  'No schema': { sev: 'warn', why: 'Without JSON-LD, Google can\'t award rich results and AI engines have to parse HTML to figure out entity/relationship signals.', sources: [['Ahrefs: Schema Markup', 'https://ahrefs.com/blog/schema-markup/'], ['Moz: Schema', 'https://moz.com/learn/seo/schema-structured-data']] },
+  'Thin content': { sev: 'warn', why: 'Pages under ~200 words rarely rank because they fail to cover intent. Google\'s Helpful Content system penalises pages that don\'t satisfy the query.', sources: [['Ahrefs: Thin Content', 'https://ahrefs.com/blog/thin-content/']] },
+  'Slow': { sev: 'warn', why: 'Response time over 3s degrades Core Web Vitals (LCP, INP) and increases bounce. Field LCP ≤2.5s is Google\'s "good" threshold.', sources: [['Ahrefs: Page Speed', 'https://ahrefs.com/blog/page-speed/'], ['Moz: Page Speed', 'https://moz.com/learn/seo/page-speed']] },
+  'Redirect': { sev: 'warn', why: 'Real content redirects mean inbound links hit stale URLs. Update internal links to the final destination to preserve crawl budget and link equity.', sources: [['Ahrefs: 301 Redirects', 'https://ahrefs.com/blog/301-redirects/'], ['Moz: Redirection', 'https://moz.com/learn/seo/redirection']] },
+  'noindex': { sev: 'error', why: 'The page is explicitly telling Google not to index it. Intentional for staging; catastrophic on money pages.', sources: [['Ahrefs: Noindex', 'https://ahrefs.com/blog/noindex/']] },
+  'HTTP': { sev: 'error', why: 'A 4xx/5xx response means users and Googlebot hit an error page. 404s on indexed URLs bleed link equity.', sources: [['Ahrefs: HTTP Status Codes', 'https://ahrefs.com/blog/http-status-codes/'], ['Moz: HTTP Status Codes', 'https://moz.com/learn/seo/http-status-codes']] },
+  'Missing viewport': { sev: 'warn', why: 'Without viewport meta, mobile browsers render at desktop width. Google flags the page as not mobile-friendly.', sources: [['Ahrefs: Mobile SEO', 'https://ahrefs.com/blog/mobile-seo/'], ['Moz: Mobile Optimization', 'https://moz.com/learn/seo/mobile-optimization']] },
+  'URL:': { sev: 'warn', why: 'URL hygiene issues (uppercase, underscores, spaces, >115 chars, tracking params) create duplicate-URL risk and hurt CTR.', sources: [['Ahrefs: URL Structure', 'https://ahrefs.com/blog/url-structure/'], ['Moz: URL', 'https://moz.com/learn/seo/url']] },
+  'Mixed content': { sev: 'error', why: 'HTTPS pages loading HTTP resources break the padlock and modern browsers block active mixed content.', sources: [['Ahrefs: HTTPS Migration', 'https://ahrefs.com/blog/https-migration/']] },
+  'Missing Open Graph': { sev: 'warn', why: 'Without og:title/og:description/og:image, Facebook/LinkedIn/Slack previews scrape random page elements. Shares look ugly, CTR drops.', sources: [['Ahrefs: Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
+  'Missing og:image': { sev: 'warn', why: 'Without an og:image, shared links render as text-only cards with significantly lower engagement. Recommended size: 1200×630.', sources: [['Ahrefs: Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
+  'Missing Twitter Card': { sev: 'info', why: 'Without twitter:card metadata, X falls back to Open Graph or plain text. Summary Large Image card gives the best preview.', sources: [['Ahrefs: Open Graph Tags', 'https://ahrefs.com/blog/open-graph-meta-tags/']] },
   // --- page_checks.py findings. Keyed by the slug normalize() returns,
   // which is what renderIssueInfo() looks up, not the card label.
   'local staging links': { sev: 'error', why: 'The page links to localhost, a private IP, or a staging subdomain of this same site. Visitors get a dead link, and a staging link that search engines follow can expose an unfinished copy of the site. Almost always a developer link that survived a deploy.', sources: [['Google - Crawling and indexing', 'https://developers.google.com/search/docs/crawling-indexing']] },
@@ -143,19 +143,19 @@ const ISSUE_META = {
   // Bulk Reports — informational panels (no severity). renderIssueInfo()
   // surfaces the why text + sources above the panel so users get context
   // without having to remember what each report is for.
-  '__all_titles':     { sev: 'info', why: 'Every crawled page with its title tag — review for keyword coverage, length, and brand consistency across the site. Use the chars column to spot truncation risk.', sources: [['Ahrefs — Title Tag', 'https://ahrefs.com/blog/title-tag/'], ['Moz — Title Tag', 'https://moz.com/learn/seo/title-tag']] },
-  '__all_metas':      { sev: 'info', why: 'Every crawled page with its meta description — scan for missing descriptions, duplication, length issues, and brand voice consistency. Google rewrites ~70% of descriptions but a strong starting point still wins CTR.', sources: [['Ahrefs — Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
-  '__all_h1s':        { sev: 'info', why: 'Every crawled page with its primary H1 — confirms the page-level topical signal Google sees. Look for H1s that don\'t match the URL/title intent (template misuse).', sources: [['Ahrefs — H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
-  '__all_canonicals': { sev: 'info', why: 'Every crawled page with its rel=canonical target. Spot self-canonicals (good), cross-canonicals to unrelated URLs (often template bugs), and missing tags.', sources: [['Ahrefs — Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/']] },
-  '__dup_titles':     { sev: 'warn', why: 'Pages sharing the same title compete with each other for the same query — Google picks one and ignores the rest. Either canonicalise, consolidate, or rewrite to differentiate.', sources: [['Ahrefs — Duplicate Content', 'https://ahrefs.com/blog/duplicate-content/']] },
-  '__dup_metas':      { sev: 'warn', why: 'Duplicate meta descriptions across many pages = generic templated copy. Pages get the same SERP snippet, weakening CTR uplift for whichever page Google picks.', sources: [['Ahrefs — Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
-  '__dup_h1s':        { sev: 'warn', why: 'Multiple pages with identical H1s look like duplicate content to Google. Either the pages truly are duplicates (consolidate) or the H1 isn\'t specific enough.', sources: [['Ahrefs — H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
-  '__dup_bodies':     { sev: 'warn', why: 'Identical body content (MD5 match on stripped text) is hard duplicate content — Google will pick one and drop the rest. Check for template bleed, paginated archives, or cross-domain syndication.', sources: [['Ahrefs — Duplicate Content', 'https://ahrefs.com/blog/duplicate-content/']] },
-  '__redir_chains':   { sev: 'warn', why: 'Each redirect hop wastes crawl budget and link equity. Google stops following after ~5 hops, after which the destination gets ignored. Always link directly to the final URL.', sources: [['Ahrefs — 301 Redirects', 'https://ahrefs.com/blog/301-redirects/'], ['Moz — Redirection', 'https://moz.com/learn/seo/redirection']] },
-  '__response_codes': { sev: 'info', why: 'Crawl-wide HTTP status code distribution. A healthy site is mostly 2xx with a small tail of 3xx redirects; spikes in 4xx/5xx mean indexable URLs are bleeding link equity to error pages.', sources: [['Ahrefs — HTTP Status Codes', 'https://ahrefs.com/blog/http-status-codes/']] },
-  '__deep':           { sev: 'warn', why: 'Pages 4+ clicks from the homepage get crawled less often and receive less PageRank. Surface them via category pages, related-content modules, or footer hub links to flatten depth.', sources: [['Ahrefs — Internal Links', 'https://ahrefs.com/blog/internal-links-for-seo/']] },
-  '__hreflang':       { sev: 'info', why: 'Hreflang tells Google which language/region a page targets. Common mistakes that silently break it: invalid lang codes, duplicate x-default, and missing return tags (page A links to B but B doesn\'t link back to A — Google ignores both).', sources: [['Ahrefs — Hreflang Guide', 'https://ahrefs.com/blog/hreflang/'], ['Google — hreflang docs', 'https://developers.google.com/search/docs/specialty/international/localized-versions']] },
-  '__traps':          { sev: 'error', why: 'The server returns 200 OK for URLs that cannot exist. A soft 404 at the root makes every mistyped URL an indexable duplicate. A 200 on a nested path under a real page is worse: the served page\'s relative links resolve one level deeper, creating an INFINITE URL space — search engines waste crawl budget on phantom pages and scrapers can crawl forever, burning unlimited bandwidth on transfer-capped hosting. Fix: return 404 (or 301 to the real page) for any path that doesn\'t map to real content.', sources: [['Google — Soft 404 errors', 'https://developers.google.com/search/docs/crawling-indexing/http-network-errors#soft-404-errors'], ['Google — Infinite spaces', 'https://developers.google.com/search/blog/2008/08/to-infinity-and-beyond-no']] },
+  '__all_titles':     { sev: 'info', why: 'Every crawled page with its title tag. Review for keyword coverage, length, and brand consistency across the site. Use the chars column to spot truncation risk.', sources: [['Ahrefs: Title Tag', 'https://ahrefs.com/blog/title-tag/'], ['Moz: Title Tag', 'https://moz.com/learn/seo/title-tag']] },
+  '__all_metas':      { sev: 'info', why: 'Every crawled page with its meta description. Scan for missing descriptions, duplication, length issues, and brand voice consistency. Google rewrites ~70% of descriptions but a strong starting point still wins CTR.', sources: [['Ahrefs: Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
+  '__all_h1s':        { sev: 'info', why: 'Every crawled page with its primary H1. It confirms the page-level topical signal Google sees. Look for H1s that don\'t match the URL/title intent (template misuse).', sources: [['Ahrefs: H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
+  '__all_canonicals': { sev: 'info', why: 'Every crawled page with its rel=canonical target. Spot self-canonicals (good), cross-canonicals to unrelated URLs (often template bugs), and missing tags.', sources: [['Ahrefs: Canonical Tags', 'https://ahrefs.com/blog/canonical-tags/']] },
+  '__dup_titles':     { sev: 'warn', why: 'Pages sharing the same title compete with each other for the same query. Google picks one and ignores the rest. Either canonicalise, consolidate, or rewrite to differentiate.', sources: [['Ahrefs: Duplicate Content', 'https://ahrefs.com/blog/duplicate-content/']] },
+  '__dup_metas':      { sev: 'warn', why: 'Duplicate meta descriptions across many pages = generic templated copy. Pages get the same SERP snippet, weakening CTR uplift for whichever page Google picks.', sources: [['Ahrefs: Meta Description', 'https://ahrefs.com/blog/meta-description/']] },
+  '__dup_h1s':        { sev: 'warn', why: 'Multiple pages with identical H1s look like duplicate content to Google. Either the pages truly are duplicates (consolidate) or the H1 isn\'t specific enough.', sources: [['Ahrefs: H1 Tag', 'https://ahrefs.com/blog/h1-tag/']] },
+  '__dup_bodies':     { sev: 'warn', why: 'Identical body content (MD5 match on stripped text) is hard duplicate content. Google will pick one and drop the rest. Check for template bleed, paginated archives, or cross-domain syndication.', sources: [['Ahrefs: Duplicate Content', 'https://ahrefs.com/blog/duplicate-content/']] },
+  '__redir_chains':   { sev: 'warn', why: 'Each redirect hop wastes crawl budget and link equity. Google stops following after ~5 hops, after which the destination gets ignored. Always link directly to the final URL.', sources: [['Ahrefs: 301 Redirects', 'https://ahrefs.com/blog/301-redirects/'], ['Moz: Redirection', 'https://moz.com/learn/seo/redirection']] },
+  '__response_codes': { sev: 'info', why: 'Crawl-wide HTTP status code distribution. A healthy site is mostly 2xx with a small tail of 3xx redirects; spikes in 4xx/5xx mean indexable URLs are bleeding link equity to error pages.', sources: [['Ahrefs: HTTP Status Codes', 'https://ahrefs.com/blog/http-status-codes/']] },
+  '__deep':           { sev: 'warn', why: 'Pages 4+ clicks from the homepage get crawled less often and receive less PageRank. Surface them via category pages, related-content modules, or footer hub links to flatten depth.', sources: [['Ahrefs: Internal Links', 'https://ahrefs.com/blog/internal-links-for-seo/']] },
+  '__hreflang':       { sev: 'info', why: 'Hreflang tells Google which language/region a page targets. Common mistakes that silently break it: invalid lang codes, duplicate x-default, and missing return tags (page A links to B but B doesn\'t link back to A, Google ignores both).', sources: [['Ahrefs: Hreflang Guide', 'https://ahrefs.com/blog/hreflang/'], ['Google: hreflang docs', 'https://developers.google.com/search/docs/specialty/international/localized-versions']] },
+  '__traps':          { sev: 'error', why: 'The server returns 200 OK for URLs that cannot exist. A soft 404 at the root makes every mistyped URL an indexable duplicate. A 200 on a nested path under a real page is worse: the served page\'s relative links resolve one level deeper, creating an INFINITE URL space, search engines waste crawl budget on phantom pages and scrapers can crawl forever, burning unlimited bandwidth on transfer-capped hosting. Fix: return 404 (or 301 to the real page) for any path that doesn\'t map to real content.', sources: [['Google: Soft 404 errors', 'https://developers.google.com/search/docs/crawling-indexing/http-network-errors#soft-404-errors'], ['Google: Infinite spaces', 'https://developers.google.com/search/blog/2008/08/to-infinity-and-beyond-no']] },
 };
 
 // Severity for the page_checks.py findings. Kept as two shared regexes
@@ -247,10 +247,13 @@ function _scWireRowClick() {
 function renderRow(d) {
   const tbody = document.getElementById('crawler-tbody');
   if (!_scRowClickWired) _scWireRowClick();
+  // A live crawl can add the first matching row under an empty state.
+  const emptyRow = tbody.querySelector('tr.sc-empty-row');
+  if (emptyRow) emptyRow.remove();
   const tr = document.createElement('tr');
   tr.style.cursor = 'pointer';
   tr.dataset.url = d.url;
-  const statusColor = d.status_code >= 400 ? '#ef4444' : d.status_code >= 300 ? '#f59e0b' : '#22c55e';
+  const statusColor = d.status_code >= 400 ? 'var(--err-fg)' : d.status_code >= 300 ? 'var(--warn-fg)' : 'var(--ok-fg)';
   // app.py canonicalizes redirect rows so result['url'] is the FINAL URL
   // and result['original_url'] is what we requested. For the URL column
   // we want the user to see the URL they (or an internal link) actually
@@ -262,7 +265,7 @@ function renderRow(d) {
   tr.innerHTML = `
     <td data-col="url" title="${escapeHtml(displayUrl)}">
       <span style="display:flex;align-items:center;gap:2px;min-width:0;">
-        <span class="url-cell" onclick="openDock(${jsArg(d.url)})" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(path)}</span>
+        <span class="url-cell" role="button" tabindex="0" onclick="openDock(${jsArg(d.url)})" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(path)}</span>
         <span class="cs-cell-actions" style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;">${_scOpenIcon(d.url)}${_scRefetchIcon(d.url)}</span>
       </span>
     </td>
@@ -536,7 +539,8 @@ function _sortGridByColumn(table, colIdx) {
   if (rows.length < 2) return;
   const dir = (String(colIdx) === table.dataset.sortCol && table.dataset.sortDir === 'asc') ? 'desc' : 'asc';
   const cellText = (r) => { const c = r.cells[colIdx]; return c ? c.textContent.trim() : ''; };
-  const isBlank = (t) => t === '' || /^—/.test(t);
+  // Empty cells show a '-' placeholder (an em dash in older builds).
+  const isBlank = (t) => t === '' || t === '-' || /^\u2014/.test(t);
   const nonEmpty = rows.map(cellText).filter(t => !isBlank(t));
   const numeric = nonEmpty.length > 0 && nonEmpty.every(t => /^-?[\d,]+(\.\d+)?$/.test(t));
   rows.sort((a, b) => {
@@ -644,13 +648,13 @@ function renderDock() {
   if (outCount) outCount.textContent = outs.length;
 
   // Details pane
-  const statusColor = page.status_code >= 400 ? '#ef4444' : page.status_code >= 300 ? '#f59e0b' : '#22c55e';
+  const statusColor = page.status_code >= 400 ? 'var(--err-fg)' : page.status_code >= 300 ? 'var(--warn-fg)' : 'var(--ok-fg)';
   const sec = page.security || {};
   const og = page.og_tags || {};
   const secBadge = (label, on) => `<span class="badge ${on?'info':'error'}" style="opacity:${on?1:.6}">${on?'✓':'✗'} ${label}</span>`;
   document.getElementById('dock-pane-details').innerHTML = `
     <dl class="kv">
-      <dt>Status</dt><dd style="color:${statusColor};font-weight:700">${page.status_code || '—'}</dd>
+      <dt>Status</dt><dd style="color:${statusColor};font-weight:700">${page.status_code || '-'}</dd>
       <dt>Title</dt><dd>${page.title ? escapeHtml(page.title) : '<em>missing</em>'} <span style="color:var(--text-muted)">(${page.title_len || 0} chars)</span></dd>
       <dt>Meta description</dt><dd>${page.meta_description ? escapeHtml(page.meta_description) : '<em>missing</em>'} <span style="color:var(--text-muted)">(${page.meta_len || 0} chars)</span></dd>
       <dt>H1${(page.h1_list || []).length > 1 ? ` <span style="color:#ef4444">×${page.h1_list.length}</span>` : ''}</dt><dd>${page.h1 ? escapeHtml(page.h1) : '<em>missing</em>'}</dd>
@@ -738,7 +742,7 @@ function renderCmsBanner(info) {
   host.innerHTML = `
     <div class="cms-banner">
       <strong>Detected: ${escapeHtml(info.label)}</strong>
-      <span style="color:var(--text-muted);font-size:11px">(${info.confidence} confidence — ${(info.signals || []).slice(0, 2).map(escapeHtml).join(' · ')})</span>
+      <span style="color:var(--text-muted);font-size:11px">(${info.confidence} confidence: ${(info.signals || []).slice(0, 2).map(escapeHtml).join(' · ')})</span>
       ${applyBtn}
       <button onclick="document.getElementById('crawler-cms-banner').innerHTML=''" style="background:transparent;color:var(--text-muted);border:1px solid var(--border)" title="Dismiss">✕</button>
       ${tipsHtml}
@@ -783,6 +787,44 @@ window.applyCmsRecs = function() {
 // targeting the suspended state on the server.
 let crawlerLastCrawlId = null;
 
+// Everything derived from one crawl that must not survive into the next one,
+// whether the next one is a fresh crawl or a saved crawl being loaded.
+// Server reports (duplicates, redirect chains, URL traps), sitemap and
+// near-duplicate results, the open dock and the report panels all used to
+// carry over, so a new crawl could show the previous site's findings until
+// its own arrived, and a loaded crawl kept the old site's sitemap tabs.
+function _scResetPerCrawlState() {
+  window.crawlerReports = null;
+  if (typeof crawlerSitemap !== 'undefined') crawlerSitemap = null;
+  window.sitemapAnalysisSkipped = false;
+  window._ndPairs = [];
+  window._ndStats = {};
+  if (typeof window.closeDock === 'function') window.closeDock();
+  const smStatus = document.getElementById('sitemap-status');
+  if (smStatus) { smStatus.style.display = 'none'; smStatus.innerHTML = ''; }
+  ['sm-cat-missing', 'sm-cat-orphan', 'sm-cat-only', 'sm-cat-noindex', 'sm-cat-non200',
+   'sm-cat-redirects', 'sm-cat-pagination', 'nd-cat-content'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.display = 'none'; const cnt = el.querySelector('.ci-count'); if (cnt) cnt.textContent = '0'; }
+  });
+  const ndHeader = document.getElementById('nd-section-header');
+  if (ndHeader) ndHeader.style.display = 'none';
+  if (typeof _scRemoveReportPanels === 'function') _scRemoveReportPanels();
+  if (typeof _scHideSavedCrawlNotice === 'function') _scHideSavedCrawlNotice();
+}
+
+// Keyboard access for the clickable divs and spans (sidebar categories,
+// summary cards, URL cells, Site Structure rows). They carry role="button"
+// and tabindex="0"; Enter or Space runs their click handler like a button.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (!el || el.getAttribute('role') !== 'button') return;
+  if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/.test(el.tagName)) return;
+  e.preventDefault();
+  el.click();
+});
+
 function startCrawl(opts) {
   opts = opts || {};
   const resumeFromId = opts.resumeFromId || null;
@@ -795,25 +837,10 @@ function startCrawl(opts) {
   if (!resumeFromId) {
     crawlerResults = [];
     crawlerInlinks = {};
-    // Reset sitemap analysis from a previous crawl + hide its sidebar entries.
-    if (typeof crawlerSitemap !== 'undefined') crawlerSitemap = null;
-    window.sitemapAnalysisSkipped = false;
-    // Close the bottom dock if it was left open on a URL from the previous
-    // crawl — otherwise it shows stale inlinks for a URL on a different host.
-    if (typeof window.closeDock === 'function') window.closeDock();
+    _scResetPerCrawlState();
   }
   if (typeof crawlerDismissErrorBanner === 'function') crawlerDismissErrorBanner();
-  if (!resumeFromId) {
-    const _smStatus = document.getElementById('sitemap-status');
-    if (_smStatus) { _smStatus.style.display = 'none'; _smStatus.innerHTML = ''; }
-    ['sm-cat-missing','sm-cat-orphan','sm-cat-only','sm-cat-noindex','sm-cat-non200','sm-cat-redirects','sm-cat-pagination'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.style.display = 'none'; const cnt = el.querySelector('.ci-count'); if (cnt) cnt.textContent = '0'; }
-    });
-    const _smPanel = document.getElementById('sitemap-panel');
-    if (_smPanel) _smPanel.remove();
-    activeCategory = 'all';
-  }
+  if (!resumeFromId) activeCategory = 'all';
 
   document.getElementById('crawler-start-btn').style.display = 'none';
   document.getElementById('crawler-stop-btn').style.display = '';
@@ -821,8 +848,6 @@ function startCrawl(opts) {
   document.getElementById('crawler-empty').style.display = 'none';
   document.getElementById('crawler-results').style.display = '';
   document.getElementById('issues-sidebar').style.display = '';
-  { const _smBtn = document.getElementById('crawler-export-sitemap-btn'); if (_smBtn) _smBtn.style.display = 'none'; }
-  { const _xBtn = document.getElementById('crawler-export-xlsx-btn'); if (_xBtn) _xBtn.style.display = 'none'; }
   // Mirror to the new topbar buttons (global, not per-view).
   { const _t = document.getElementById('topbar-export-sitemap'); if (_t) _t.style.display = 'none'; }
   { const _t = document.getElementById('topbar-export-xlsx'); if (_t) _t.style.display = 'none'; }
@@ -946,13 +971,13 @@ function startCrawl(opts) {
               const applyBtn = document.getElementById('crawler-apply-rules');
               if (applyBtn) applyBtn.disabled = !crawlerCrawlId;
             } else if (p.type === 'resumed') {
-              showToast(`Resumed — picking up ${p.previous_pages} pages, ${p.queued} URLs still in queue`, 'info');
+              showToast(`Resumed: picking up ${p.previous_pages} pages, ${p.queued} URLs still in queue`, 'info');
             } else if (p.type === 'limit_reached') {
               crawlerShowLimitBanner(p.fetched, p.queued, p.current_max);
               crawlerUpdateQueuePanel(p.queue_sample, p.queued);
             } else if (p.type === 'crawl_resumed') {
               crawlerHideLimitBanner();
-              showToast(`Crawl resumed — page cap raised to ${p.new_max}`, 'info');
+              showToast(`Crawl resumed: page cap raised to ${p.new_max}`, 'info');
             } else if (p.type === 'complete') {
               crawlerLastCrawlId = null;  // crawl finished naturally
               // Server-computed reports (duplicates, redirect chains, response
@@ -990,12 +1015,15 @@ function startCrawl(opts) {
               if (p.stop_reason) {
                 crawlerShowErrorBanner(p.stop_reason, url);
               }
-              // Post-crawl landing: switch to Summary so users immediately
-              // see what needs fixing instead of staring at the raw row
-              // table. Wrapped in setTimeout so the last batch of row
-              // renders flushes before we swap views.
+              // Post-crawl landing: Summary, so users see what needs fixing
+              // instead of the raw row table. But if they opened a tab of
+              // their own while the crawl ran, stay there and redraw it with
+              // the final data rather than pulling them away. Wrapped in
+              // setTimeout so the last batch of row renders flushes first.
               setTimeout(() => {
-                if (typeof selectCategory === 'function') selectCategory('__summary');
+                if (typeof selectCategory !== 'function') return;
+                const stay = activeCategory && activeCategory !== 'all' && activeCategory !== '__summary';
+                selectCategory(stay ? activeCategory : '__summary');
               }, 50);
             }
           } catch {}
@@ -1055,7 +1083,8 @@ function showToast(message, kind) {
     return s;
   })();
   const t = document.createElement('div');
-  const bg = kind === 'error' ? '#dc2626' : kind === 'warn' ? '#f59e0b' : '#0ea5e9';
+  // Deep enough for white text to stay readable (about 5:1 or better).
+  const bg = kind === 'error' ? '#dc2626' : kind === 'warn' ? '#b45309' : kind === 'success' ? '#15803d' : '#0369a1';
   t.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,0.15);pointer-events:auto;`;
   t.textContent = message;
   stack.appendChild(t);
@@ -1066,7 +1095,7 @@ function crawlerShowLimitBanner(fetched, queued, currentMax) {
   const banner = document.getElementById('crawler-limit-banner');
   const msg = document.getElementById('crawler-limit-banner-msg');
   if (!banner || !msg) return;
-  msg.textContent = `Crawled ${fetched} of ${currentMax} cap — ${queued} URL${queued === 1 ? '' : 's'} still queued. Bump the cap to keep going, or finalize with what we have.`;
+  msg.textContent = `Crawled ${fetched} of ${currentMax} cap: ${queued} URL${queued === 1 ? '' : 's'} still queued. Bump the cap to keep going, or finalize with what we have.`;
   banner.style.display = 'flex';
   const empty = document.getElementById('crawler-empty');
   const results = document.getElementById('crawler-results');
@@ -1211,7 +1240,7 @@ function crawlerShowQueue() {
   const panel = document.getElementById('crawler-queue-panel');
   const body = document.getElementById('crawler-queue-body');
   if (!panel || panel.style.display === 'none') {
-    showToast('Queue is empty — nothing waiting to crawl.', 'info');
+    showToast('Queue is empty: nothing waiting to crawl.', 'info');
     return;
   }
   if (body && body.style.display === 'none') crawlerToggleQueuePanel();
@@ -1277,6 +1306,20 @@ function matchesCategory(page, cat) {
   if (cat === 'pagination not linked') return /pagination url\(s\) declared by rel/.test(joined);
   if (cat === 'hreflang no return')   return /hreflang alternate\(s\) do not link back/.test(joined);
   return joined.includes(cat.toLowerCase());
+}
+
+// Every report panel id, in one list for both paths through selectCategory.
+// There used to be two copies and the report-to-report one lacked
+// traps-panel and imgs-missing-alt-panel, so the Soft 404 panel stayed on
+// screen above the next report (Deep Pages, say).
+const _SC_REPORT_PANEL_IDS = [
+  'sitemap-panel', 'schema-by-page-panel', 'near-dup-panel', 'sitestructure-panel',
+  'all-images-panel', 'imgs-missing-alt-panel', 'external-links-panel', 'js-diff-panel',
+  'all-values-panel', 'duplicates-panel', 'redir-chains-panel', 'traps-panel',
+  'response-codes-panel', 'deep-pages-panel', 'hreflang-panel', 'severity-panel', 'summary-panel',
+];
+function _scRemoveReportPanels() {
+  _SC_REPORT_PANEL_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
 }
 
 window.selectCategory = function(cat) {
@@ -1372,29 +1415,29 @@ window.selectCategory = function(cat) {
     'Paginated page set to noindex': 'Paginated Pages Set to Noindex',
     'Paginated page canonicalised to another URL': 'Paginated Pages Canonicalised Away',
     '__sm_missing': 'Missing from Sitemap', '__sm_orphan': 'Orphan in Sitemap',
-    '__sm_only': 'Orphan Pages — No Internal Links', '__sm_noindex': 'Non-Indexable in Sitemap',
+    '__sm_only': 'Orphan Pages: No Internal Links', '__sm_noindex': 'Non-Indexable in Sitemap',
     '__sm_non200': 'Non-200 in Sitemap', '__sm_redirects': 'Redirects in Sitemap',
     '__sm_pagination': 'Pagination in Sitemap',
-    '__nd_content': 'Near-Duplicate Content — pairs above the similarity threshold',
-    '__schema_by_page': 'Schema by Page — every crawled page with the schema types it emits',
-    '__sitemap_viz': 'Site Structure — sunburst, hierarchy and anchor-text cloud',
-    '__all_images': 'All Images — every image across the crawl with alt text and the page(s) it appears on',
-    '__external_links': 'External Links — every off-domain link with rel/target attributes. Filter by follow / nofollow / same-window. Risky = follow + same-window (leaks link equity AND loses the visitor).',
-    '__js_diff': 'JS vs non-JS Diff — pages whose content differs between rendered and raw HTML',
-    '__all_titles':    'All Titles — every crawled page with its title tag',
-    '__all_metas':     'All Meta Descriptions — every crawled page with its meta description',
-    '__all_h1s':       'All H1s — every crawled page with its primary H1',
-    '__all_canonicals':'All Canonicals — every crawled page with its rel=canonical target',
-    '__dup_titles':    'Duplicate Titles — groups of pages sharing a title',
-    '__dup_metas':     'Duplicate Meta Descriptions — groups of pages sharing a meta description',
-    '__dup_h1s':       'Duplicate H1s — groups of pages sharing an H1',
-    '__dup_bodies':    'Duplicate Body Content — groups of pages with identical body hash',
+    '__nd_content': 'Near-Duplicate Content: pairs above the similarity threshold',
+    '__schema_by_page': 'Schema by Page: every crawled page with the schema types it emits',
+    '__sitemap_viz': 'Site Structure: sunburst, hierarchy and anchor-text cloud',
+    '__all_images': 'All Images: every image across the crawl with alt text and the page(s) it appears on',
+    '__external_links': 'External Links: every off-domain link with rel/target attributes. Filter by follow / nofollow / same-window. Risky = follow + same-window (leaks link equity AND loses the visitor).',
+    '__js_diff': 'JS vs non-JS Diff: pages whose content differs between rendered and raw HTML',
+    '__all_titles':    'All Titles: every crawled page with its title tag',
+    '__all_metas':     'All Meta Descriptions: every crawled page with its meta description',
+    '__all_h1s':       'All H1s: every crawled page with its primary H1',
+    '__all_canonicals':'All Canonicals: every crawled page with its rel=canonical target',
+    '__dup_titles':    'Duplicate Titles: groups of pages sharing a title',
+    '__dup_metas':     'Duplicate Meta Descriptions: groups of pages sharing a meta description',
+    '__dup_h1s':       'Duplicate H1s: groups of pages sharing an H1',
+    '__dup_bodies':    'Duplicate Body Content: groups of pages with identical body hash',
     '__redir_chains':  'Redirect Chains (2+ hops)',
     '__traps':         'Soft 404s / Infinite URL Trap (server answers 200 for non-existent URLs)',
     '__response_codes':'Response Code Distribution',
     '__deep':          'Deep Pages (4+ clicks from home)',
     '__hreflang':      'Hreflang Implementation',
-    '__summary':       'Crawl Summary — what needs fixing, grouped by severity',
+    '__summary':       'Crawl Summary: what needs fixing, grouped by severity',
   };
   document.getElementById('detail-title-text').textContent = titleMap[cat] || cat;
 
@@ -1415,12 +1458,7 @@ window.selectCategory = function(cat) {
     if (typeof _scApplyMultiH1Columns === 'function') _scApplyMultiH1Columns(0);
     if (_tableWrap) _tableWrap.style.display = 'none';
     if (_expandHint) _expandHint.style.display = 'none';
-    ['sitemap-panel','schema-by-page-panel','near-dup-panel','sitestructure-panel',
-     'all-images-panel','imgs-missing-alt-panel','external-links-panel','js-diff-panel',
-     'all-values-panel','duplicates-panel',
-     'redir-chains-panel','response-codes-panel','deep-pages-panel','hreflang-panel',
-     'severity-panel','summary-panel']
-      .forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+    _scRemoveReportPanels();
     _scRenderImagesMissingAltPanel();
     const bulkBtn = document.getElementById('crawler-bulk-recrawl-btn');
     if (bulkBtn) bulkBtn.style.display = 'none';
@@ -1440,12 +1478,7 @@ window.selectCategory = function(cat) {
     // Strip any previously-rendered special panel so we don't stack them.
     // Each renderer removes only its own ID; switching between special tabs
     // without this would leave stale Schema/Images/etc. panels in the DOM.
-    ['sitemap-panel','schema-by-page-panel','near-dup-panel','sitestructure-panel',
-     'all-images-panel','external-links-panel','js-diff-panel',
-     'all-values-panel','duplicates-panel',
-     'redir-chains-panel','response-codes-panel','deep-pages-panel','hreflang-panel',
-     'severity-panel','summary-panel']
-      .forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+    _scRemoveReportPanels();
     if (cat === '__schema_by_page') {
       _renderSchemaByPagePanel();
     } else if (cat === '__nd_content') {
@@ -1489,12 +1522,7 @@ window.selectCategory = function(cat) {
   // new view (e.g. External Links lingering under Redirects, or — the
   // user-reported bug — Summary lingering under Missing Meta Description
   // because 'summary-panel' wasn't in this list).
-  ['sitemap-panel','schema-by-page-panel','near-dup-panel','sitestructure-panel',
-   'all-images-panel','imgs-missing-alt-panel','external-links-panel','js-diff-panel',
-   'all-values-panel','duplicates-panel',
-   'redir-chains-panel','traps-panel','response-codes-panel','deep-pages-panel','hreflang-panel',
-   'severity-panel','summary-panel']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+  _scRemoveReportPanels();
   if (_tableWrap) _tableWrap.style.display = '';
   if (_expandHint) _expandHint.style.display = '';
 
@@ -1517,6 +1545,14 @@ window.selectCategory = function(cat) {
   }
   let _matched = 0;
   for (const r of rows) { renderRow(r); _matched++; }
+  // Say so when a check found nothing, instead of leaving a bare header row
+  // that reads like a table still loading.
+  if (!_matched && crawlerResults.length) {
+    const tr = document.createElement('tr');
+    tr.className = 'sc-empty-row';
+    tr.innerHTML = `<td colspan="99">${cat === 'all' ? 'No pages in this crawl yet.' : '✓ No pages with this issue in this crawl.'}</td>`;
+    tbody.appendChild(tr);
+  }
   // Show the bulk-recrawl button for any category that has rows. Lets the
   // user fix a batch in WP, then verify with one click that the fix landed.
   const bulkBtn = document.getElementById('crawler-bulk-recrawl-btn');
@@ -1602,7 +1638,7 @@ window.analyseSitemap = async function(opts) {
     });
     let d = null; try { d = await r.json(); } catch {}
     if (!r.ok) {
-      _smSetStatus('prompt', { reason: `Server returned ${r.status}` + (d && d.error ? ` — ${d.error}` : '') });
+      _smSetStatus('prompt', { reason: `Server returned ${r.status}` + (d && d.error ? ` - ${d.error}` : '') });
       return;
     }
     if (!d || !d.sitemaps_found || !d.sitemaps_found.length) {
@@ -1721,8 +1757,8 @@ function _scRenderJsDiffPanel() {
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtVal = (v) => {
-    if (v == null || v === '') return '<span style="color:var(--text-muted);font-style:italic;">— empty</span>';
-    if (Array.isArray(v)) return v.length ? v.map(x => `<code style="font-size:10.5px;background:var(--surface2,#f8fafc);padding:1px 5px;border-radius:3px;margin-right:3px;">${esc(x)}</code>`).join('') : '<span style="color:var(--text-muted);font-style:italic;">— none</span>';
+    if (v == null || v === '') return '<span style="color:var(--text-muted);font-style:italic;">(empty)</span>';
+    if (Array.isArray(v)) return v.length ? v.map(x => `<code style="font-size:10.5px;background:var(--surface2,#f8fafc);padding:1px 5px;border-radius:3px;margin-right:3px;">${esc(x)}</code>`).join('') : '<span style="color:var(--text-muted);font-style:italic;">(none)</span>';
     return esc(v);
   };
   const fieldRow = (label, jsVal, nojsVal, differs) => {
@@ -1822,7 +1858,14 @@ function _scRenderImagesMissingAltPanel() {
   const groups = Array.from(bySrc.values()).sort((a, b) => b.pages.length - a.pages.length);
 
   if (!groups.length) {
-    panel.innerHTML = '<div style="padding:20px;color:var(--text-muted);">No images missing alt text in this crawl. 🎉 (Older crawls predate image capture — re-crawl to populate.)</div>';
+    // Crawls saved before per-image capture have no image data at all; only
+    // they need the re-crawl hint, not a fresh crawl that is simply clean.
+    const hasImageData = (crawlerResults || []).some(r => Array.isArray(r.images_all_data) || Array.isArray(r.images_no_alt_data));
+    panel.innerHTML = '<div style="padding:20px;color:var(--text-muted);">'
+      + (hasImageData
+        ? '✓ No images missing alt text in this crawl.'
+        : 'No image data in this crawl. It was saved before image capture was added: run a new crawl to check alt text.')
+      + '</div>';
     main.appendChild(panel);
     return;
   }
@@ -1942,9 +1985,9 @@ function _scRenderAllImagesPanel() {
 
   // Friendly summary card with built-in legend.
   const _altCellHtml = (cls, alt) => {
-    if (cls === 'missing') return `<span style="color:#ef4444;font-style:italic;">— missing</span>`;
-    if (cls === 'empty')   return `<span style="color:#f59e0b;font-style:italic;">— empty (decorative)</span>`;
-    if (cls === 'empty in link') return `<span style="color:#ef4444;font-style:italic;">— empty alt on a link (no accessible name)</span>`;
+    if (cls === 'missing') return `<span style="color:#ef4444;font-style:italic;">missing</span>`;
+    if (cls === 'empty')   return `<span style="color:#f59e0b;font-style:italic;">empty (decorative)</span>`;
+    if (cls === 'empty in link') return `<span style="color:#ef4444;font-style:italic;">empty alt on a link (no accessible name)</span>`;
     return escapeHtml(alt || '');
   };
 
@@ -1959,10 +2002,10 @@ function _scRenderAllImagesPanel() {
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
         <button type="button" class="sc-ai-chip sc-ai-chip-active" data-filter="all" onclick="_scAllImagesFilter('all')" style="padding:4px 12px;border-radius:14px;border:1px solid var(--text);background:var(--text);color:var(--surface);font-size:11.5px;cursor:pointer;font-weight:600;">All <span style="opacity:.75;font-weight:400;">${uniq}</span></button>
-        ${missing ? `<button type="button" class="sc-ai-chip" data-filter="missing" onclick="_scAllImagesFilter('missing')" title="No alt attribute at all — Google + screen readers can't read these. Real problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Missing alt <span style="font-weight:400;">${missing}</span></button>` : ''}
-        ${emptyLink ? `<button type="button" class="sc-ai-chip" data-filter="empty in link" onclick="_scAllImagesFilter('empty in link')" title="alt=&quot;&quot; on a clickable image — screen reader has nothing to announce. Real problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Empty alt in link <span style="font-weight:400;">${emptyLink}</span></button>` : ''}
-        ${emptyDeco ? `<button type="button" class="sc-ai-chip" data-filter="empty" onclick="_scAllImagesFilter('empty')" title="alt=&quot;&quot; on a non-link image — CORRECT pattern for purely decorative images. Not a problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fcd34d;background:#fef3c7;color:#92400e;font-size:11.5px;cursor:pointer;font-weight:600;">Decorative (alt="") <span style="font-weight:400;">${emptyDeco}</span></button>` : ''}
-        ${present ? `<button type="button" class="sc-ai-chip" data-filter="present" onclick="_scAllImagesFilter('present')" title="Has meaningful alt text. Already fine — review the wording." style="padding:4px 12px;border-radius:14px;border:1px solid #bbf7d0;background:#dcfce7;color:#166534;font-size:11.5px;cursor:pointer;font-weight:600;">Has alt <span style="font-weight:400;">${present}</span></button>` : ''}
+        ${missing ? `<button type="button" class="sc-ai-chip" data-filter="missing" onclick="_scAllImagesFilter('missing')" title="No alt attribute at all: Google + screen readers can't read these. Real problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Missing alt <span style="font-weight:400;">${missing}</span></button>` : ''}
+        ${emptyLink ? `<button type="button" class="sc-ai-chip" data-filter="empty in link" onclick="_scAllImagesFilter('empty in link')" title="alt=&quot;&quot; on a clickable image, screen reader has nothing to announce. Real problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Empty alt in link <span style="font-weight:400;">${emptyLink}</span></button>` : ''}
+        ${emptyDeco ? `<button type="button" class="sc-ai-chip" data-filter="empty" onclick="_scAllImagesFilter('empty')" title="alt=&quot;&quot; on a non-link image, CORRECT pattern for purely decorative images. Not a problem." style="padding:4px 12px;border-radius:14px;border:1px solid #fcd34d;background:#fef3c7;color:#92400e;font-size:11.5px;cursor:pointer;font-weight:600;">Decorative (alt="") <span style="font-weight:400;">${emptyDeco}</span></button>` : ''}
+        ${present ? `<button type="button" class="sc-ai-chip" data-filter="present" onclick="_scAllImagesFilter('present')" title="Has meaningful alt text. Already fine: review the wording." style="padding:4px 12px;border-radius:14px;border:1px solid #bbf7d0;background:#dcfce7;color:#166534;font-size:11.5px;cursor:pointer;font-weight:600;">Has alt <span style="font-weight:400;">${present}</span></button>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;">
           <button type="button" onclick="_scCopyAllImages()" title="Copy Image src → Alt → Page URLs as TSV (paste into Sheets/Excel)" style="padding:5px 12px;font-size:11.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text);">Copy as TSV</button>
         </div>
@@ -1970,9 +2013,9 @@ function _scRenderAllImagesPanel() {
       <details style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">
         <summary style="cursor:pointer;user-select:none;">What's the difference between "missing alt" and "empty alt"?</summary>
         <div style="padding:6px 0 0 14px;line-height:1.55;">
-          <div><b style="color:#991b1b;">Missing alt</b> — the <code>&lt;img&gt;</code> has no <code>alt</code> attribute at all. HTML5 violation. Google can't read the image, screen readers announce the filename. <b>Always fix.</b></div>
-          <div style="margin-top:4px;"><b style="color:#92400e;">Empty alt (decorative)</b> — <code>alt=""</code> on a non-link image. <b>This is the CORRECT pattern</b> for purely decorative images. Tells screen readers to skip. Listed so you can spot ones that should actually have alt text.</div>
-          <div style="margin-top:4px;"><b style="color:#991b1b;">Empty alt in link</b> — <code>alt=""</code> on an <code>&lt;a&gt;</code>/<code>&lt;button&gt;</code> with no other text. The link has no accessible name at all. <b>Always fix.</b></div>
+          <div><b style="color:#991b1b;">Missing alt</b>: the <code>&lt;img&gt;</code> has no <code>alt</code> attribute at all. HTML5 violation. Google can't read the image, screen readers announce the filename. <b>Always fix.</b></div>
+          <div style="margin-top:4px;"><b style="color:#92400e;">Empty alt (decorative)</b>-<code>alt=""</code> on a non-link image. <b>This is the CORRECT pattern</b> for purely decorative images. Tells screen readers to skip. Listed so you can spot ones that should actually have alt text.</div>
+          <div style="margin-top:4px;"><b style="color:#991b1b;">Empty alt in link</b>-<code>alt=""</code> on an <code>&lt;a&gt;</code>/<code>&lt;button&gt;</code> with no other text. The link has no accessible name at all. <b>Always fix.</b></div>
         </div>
       </details>
     </div>
@@ -1995,7 +2038,7 @@ function _scRenderAllImagesPanel() {
           const altHtml = _altCellHtml(first.classification, first.alt);
           const pagesHtml = g.pages.length === 1
             ? `<a href="${escapeHtml(first.url)}" target="_blank" style="color:var(--accent);">${escapeHtml(first.url)}</a>${typeof _scOpenIcon === 'function' ? _scOpenIcon(first.url) : ''}`
-            : `<details style="margin:0;"><summary style="cursor:pointer;color:var(--text);"><b>${g.pages.length}</b> pages — <span style="color:var(--text-muted);">click to expand</span></summary>${g.pages.map(p => `<div style="font-size:.72rem;padding:3px 0;border-top:1px dashed var(--border);margin-top:4px;"><a href="${escapeHtml(p.url)}" target="_blank" style="color:var(--accent);">${escapeHtml(p.url)}</a><div style="color:var(--text-muted);margin-top:2px;">alt: ${_altCellHtml(p.classification, p.alt)}</div></div>`).join('')}</details>`;
+            : `<details style="margin:0;"><summary style="cursor:pointer;color:var(--text);"><b>${g.pages.length}</b> pages: <span style="color:var(--text-muted);">click to expand</span></summary>${g.pages.map(p => `<div style="font-size:.72rem;padding:3px 0;border-top:1px dashed var(--border);margin-top:4px;"><a href="${escapeHtml(p.url)}" target="_blank" style="color:var(--accent);">${escapeHtml(p.url)}</a><div style="color:var(--text-muted);margin-top:2px;">alt: ${_altCellHtml(p.classification, p.alt)}</div></div>`).join('')}</details>`;
           return `
             <tr data-src="${safeSrc}" data-cls="${escapeHtml(first.classification || 'present')}" style="border-bottom:1px solid var(--border);">
               <td style="text-align:center;padding:4px;"><img src="${safeSrc}" alt="" loading="lazy" style="max-width:80px;max-height:80px;border-radius:3px;border:1px solid var(--border);background:#fff;" onerror="this.style.opacity='.3';this.title='Failed to load';" /></td>
@@ -2102,12 +2145,12 @@ function _scRenderExternalLinksPanel() {
       <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.55;">
         <b>${allLinks.length}</b> external link${allLinks.length === 1 ? '' : 's'} pointing to <b>${domains.size}</b> domain${domains.size === 1 ? '' : 's'}.
         ${counts.high
-          ? ` <b style="color:#991b1b;">${counts.high} risky</b> <span>(follow + same-window — leaks SEO equity AND loses the visitor)</span>`
+          ? ` <b style="color:#991b1b;">${counts.high} risky</b> <span>(follow + same-window: leaks SEO equity AND loses the visitor)</span>`
           : ` <b style="color:#166534;">No risky links found.</b>`}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
         <button type="button" class="sc-el-chip sc-el-chip-active" data-filter="all" onclick="_scExternalLinksFilter('all')" style="padding:4px 12px;border-radius:14px;border:1px solid var(--text);background:var(--text);color:var(--surface);font-size:11.5px;cursor:pointer;font-weight:600;">All <span style="opacity:.75;font-weight:400;">${counts.all}</span></button>
-        ${counts.high ? `<button type="button" class="sc-el-chip" data-filter="high" onclick="_scExternalLinksFilter('high')" title="Follow + same-window — leaks link equity AND pushes the visitor off your site." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Risky <span style="font-weight:400;">${counts.high}</span></button>` : ''}
+        ${counts.high ? `<button type="button" class="sc-el-chip" data-filter="high" onclick="_scExternalLinksFilter('high')" title="Follow + same-window, leaks link equity AND pushes the visitor off your site." style="padding:4px 12px;border-radius:14px;border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;font-size:11.5px;cursor:pointer;font-weight:600;">⚠ Risky <span style="font-weight:400;">${counts.high}</span></button>` : ''}
         ${counts.follow ? `<button type="button" class="sc-el-chip" data-filter="follow" onclick="_scExternalLinksFilter('follow')" title="No rel=nofollow. Passes SEO equity to the destination." style="padding:4px 12px;border-radius:14px;border:1px solid #fcd34d;background:#fef3c7;color:#92400e;font-size:11.5px;cursor:pointer;font-weight:600;">Follow <span style="font-weight:400;">${counts.follow}</span></button>` : ''}
         ${counts.nofollow ? `<button type="button" class="sc-el-chip" data-filter="nofollow" onclick="_scExternalLinksFilter('nofollow')" title="Has rel=nofollow / ugc / sponsored. Doesn't pass equity." style="padding:4px 12px;border-radius:14px;border:1px solid #bbf7d0;background:#dcfce7;color:#166534;font-size:11.5px;cursor:pointer;font-weight:600;">Nofollow <span style="font-weight:400;">${counts.nofollow}</span></button>` : ''}
         ${counts.samewindow ? `<button type="button" class="sc-el-chip" data-filter="samewindow" onclick="_scExternalLinksFilter('samewindow')" title="No target=_blank. Visitor leaves your site on click." style="padding:4px 12px;border-radius:14px;border:1px solid #fcd34d;background:#fef3c7;color:#92400e;font-size:11.5px;cursor:pointer;font-weight:600;">Same window <span style="font-weight:400;">${counts.samewindow}</span></button>` : ''}
@@ -2116,11 +2159,11 @@ function _scRenderExternalLinksPanel() {
       <details style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">
         <summary style="cursor:pointer;user-select:none;">What does each filter mean?</summary>
         <div style="padding:6px 0 0 14px;line-height:1.55;">
-          <div><b style="color:#991b1b;">Risky</b> — link has neither <code>rel=nofollow</code> nor <code>target=_blank</code>. Passes link equity to a third-party domain AND opens in the same tab so the visitor leaves your site.</div>
-          <div style="margin-top:4px;"><b style="color:#92400e;">Follow / dofollow</b> — no <code>rel=nofollow</code>. Passes SEO equity to the destination. Fine for trusted citations; problematic on user-generated content, sponsored posts, or untrusted sources.</div>
-          <div style="margin-top:4px;"><b style="color:#166534;">Nofollow</b> — has <code>rel=nofollow</code>, <code>ugc</code>, or <code>sponsored</code>. Doesn't pass equity. Right for paid links and untrusted content.</div>
-          <div style="margin-top:4px;"><b style="color:#92400e;">Same window</b> — no <code>target=_blank</code>. Visitor leaves your site on click. Usually bad UX on external links.</div>
-          <div style="margin-top:4px;"><b style="color:#1e40af;">New tab</b> — <code>target=_blank</code> set. External link opens in a new tab; your page stays open.</div>
+          <div><b style="color:#991b1b;">Risky</b>: link has neither <code>rel=nofollow</code> nor <code>target=_blank</code>. Passes link equity to a third-party domain AND opens in the same tab so the visitor leaves your site.</div>
+          <div style="margin-top:4px;"><b style="color:#92400e;">Follow / dofollow</b>: no <code>rel=nofollow</code>. Passes SEO equity to the destination. Fine for trusted citations; problematic on user-generated content, sponsored posts, or untrusted sources.</div>
+          <div style="margin-top:4px;"><b style="color:#166534;">Nofollow</b>: has <code>rel=nofollow</code>, <code>ugc</code>, or <code>sponsored</code>. Doesn't pass equity. Right for paid links and untrusted content.</div>
+          <div style="margin-top:4px;"><b style="color:#92400e;">Same window</b>: no <code>target=_blank</code>. Visitor leaves your site on click. Usually bad UX on external links.</div>
+          <div style="margin-top:4px;"><b style="color:#1e40af;">New tab</b>-<code>target=_blank</code> set. External link opens in a new tab; your page stays open.</div>
         </div>
       </details>
     </div>
@@ -2312,7 +2355,7 @@ function _scRenderAllValuesPanel(cat) {
           const under = spec.limit && v && spec.minLen && n < spec.minLen;
           const u = r.url || '';
           const safeU = escapeHtml(u);
-          const safeV = v ? escapeHtml(v) : `<span style="color:#ef4444;font-style:italic;">— ${escapeHtml(spec.emptyClass)}</span>`;
+          const safeV = v ? escapeHtml(v) : `<span style="color:#ef4444;font-style:italic;">${escapeHtml(spec.emptyClass)}</span>`;
           const cellStyle = over ? 'color:#ef4444;' : (under ? 'color:#f59e0b;' : '');
           return `
             <tr data-url="${safeU}" data-value="${escapeHtml((v || '').toLowerCase())}">
@@ -2441,7 +2484,7 @@ function _scRenderDuplicatesPanel(cat) {
       <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">Duplicate ${escapeHtml(spec.label)}s</div>
       <div style="font-size:.75rem;color:var(--text-muted);line-height:1.55;">
         <b>${groups.length}</b> duplicate group${groups.length === 1 ? '' : 's'} covering <b>${pageCount}</b> page${pageCount === 1 ? '' : 's'}.
-        Pages sharing the same ${escapeHtml(spec.label)} compete with each other for the same query — pick one canonical version or rewrite to differentiate.
+        Pages sharing the same ${escapeHtml(spec.label)} compete with each other for the same query. Pick one canonical version or rewrite to differentiate.
       </div>
     </div>`;
 
@@ -2507,7 +2550,7 @@ function _scRenderRedirChainsPanel() {
       <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">Redirect chains (2+ hops)</div>
       <div style="font-size:.75rem;color:var(--text-muted);line-height:1.55;">
         <b>${chains.length}</b> URL${chains.length === 1 ? '' : 's'} require multiple redirect hops to reach the final destination.
-        Update internal links to point directly to the final URL — Google stops following after ~5 hops, and every hop wastes link equity.
+        Update internal links to point directly to the final URL. Google stops following after ~5 hops, and every hop wastes link equity.
       </div>
     </div>`;
 
@@ -2559,8 +2602,8 @@ function _scRenderTrapsPanel() {
       <div style="padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:.78rem;">
         <b>${p.kind === 'root' ? 'Root probe (soft-404 check)' : 'Nested-path probe (infinite URL space check)'}</b>
         ${p.status === 200
-          ? '<span style="color:#ef4444;font-weight:700;margin-left:8px;">FAILED — returned 200</span>'
-          : `<span style="color:#22c55e;font-weight:700;margin-left:8px;">OK — ${p.status ?? escapeHtml(p.error || '')}</span>`}
+          ? '<span style="color:#ef4444;font-weight:700;margin-left:8px;">FAILED: returned 200</span>'
+          : `<span style="color:#22c55e;font-weight:700;margin-left:8px;">OK: ${p.status ?? escapeHtml(p.error || '')}</span>`}
       </div>
       <div style="padding:8px 14px;font-family:'SF Mono','Menlo',monospace;font-size:.72rem;word-break:break-all;">
         GET ${escapeHtml(p.url || '')}<br>→ ${p.status ?? escapeHtml(p.error || '')}
@@ -2573,12 +2616,12 @@ function _scRenderTrapsPanel() {
     panel.innerHTML = `
       <div style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface2);">
         <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">Not checked on this crawl</div>
-        <div style="font-size:.75rem;color:var(--text-muted);">Re-crawl to run the soft-404 / URL-trap probe — crawls saved before this feature don't carry it.</div>
+        <div style="font-size:.75rem;color:var(--text-muted);">Re-crawl to run the soft-404 / URL-trap probe, crawls saved before this feature don't carry it.</div>
       </div>`;
   } else if (!tc.soft_404 && !tc.nested_trap) {
     panel.innerHTML = `
       <div style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface2);">
-        <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">✓ Healthy — no soft 404s, no URL trap</div>
+        <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">✓ Healthy: no soft 404s, no URL trap</div>
         <div style="font-size:.75rem;color:var(--text-muted);">Both probe URLs were refused (non-200): the server does not serve content for URLs that don't exist.</div>
       </div>
       <div style="padding:0 16px 16px;">${(tc.probes || []).map(probeCard).join('')}</div>`;
@@ -2588,7 +2631,7 @@ function _scRenderTrapsPanel() {
         <div style="font-size:.9rem;font-weight:600;color:#ef4444;margin-bottom:4px;">${tc.nested_trap ? 'Infinite URL trap detected' : 'Soft 404s detected'}</div>
         <div style="font-size:.75rem;color:var(--text-muted);line-height:1.55;">
           This server answers <b>200 OK</b> for URLs that don't exist${tc.nested_trap ? ', including nested paths under real pages. Relative links on the served page resolve one level deeper, so the crawlable URL space is <b>infinite</b>' : ''}.
-          Search engines waste crawl budget on phantom duplicates, and bots/scrapers can crawl forever — on bandwidth-capped hosting this can take the site offline (509 Bandwidth Limit Exceeded).
+          Search engines waste crawl budget on phantom duplicates, and bots/scrapers can crawl forever. On bandwidth-capped hosting this can take the site offline (509 Bandwidth Limit Exceeded).
           Fix on the server: return <b>404</b> (or 301 to the real page) for any path that doesn't map to real content.
         </div>
       </div>
@@ -2650,7 +2693,7 @@ function _scRenderResponseCodesPanel() {
             const pct = total ? (urls.length / total * 100).toFixed(1) : '0.0';
             const examples = urls.slice(0, 3).map(u => `<a href="${escapeHtml(u)}" target="_blank" style="color:var(--accent);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(u)}</a>`).join('');
             return `<tr>
-              <td style="color:${color};font-weight:700;">${code || '—'}</td>
+              <td style="color:${color};font-weight:700;">${code || '-'}</td>
               <td style="font-variant-numeric:tabular-nums;">${urls.length}</td>
               <td style="font-variant-numeric:tabular-nums;color:var(--text-muted);">${pct}%</td>
               <td style="overflow:hidden;">${examples}</td>
@@ -2845,7 +2888,7 @@ function _scRenderSummaryPanel() {
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px;">
             <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};"></span>
             ${title}
-            <span style="color:var(--text-muted);font-weight:500;font-size:12px;">— nothing to fix</span>
+            <span style="color:var(--text-muted);font-weight:500;font-size:12px;">· nothing to fix</span>
           </div>
         </div>`;
     }
@@ -2854,11 +2897,11 @@ function _scRenderSummaryPanel() {
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
           <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};"></span>
           ${title}
-          <span style="color:var(--text-muted);font-weight:500;font-size:12px;">— ${pagesAffected[sevKey]} page${pagesAffected[sevKey]===1?'':'s'} affected</span>
+          <span style="color:var(--text-muted);font-weight:500;font-size:12px;">· ${pagesAffected[sevKey]} page${pagesAffected[sevKey]===1?'':'s'} affected</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;">
           ${rows.map(r => `
-            <div onclick="selectCategory(${jsArg(r.slug)})"
+            <div role="button" tabindex="0" onclick="selectCategory(${jsArg(r.slug)})"
                  style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
                  onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
                  onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
@@ -2876,16 +2919,16 @@ function _scRenderSummaryPanel() {
   panel.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
       ${stat('Pages crawled', pages.length, 'var(--text)')}
-      ${stat('Errors', pagesAffected.error, '#ef4444')}
-      ${stat('Warnings', pagesAffected.warn, '#f59e0b')}
-      ${stat('Info', pagesAffected.info, '#0ea5e9')}
+      ${stat('Errors', pagesAffected.error, 'var(--err-fg)')}
+      ${stat('Warnings', pagesAffected.warn, 'var(--warn-fg)')}
+      ${stat('Info', pagesAffected.info, 'var(--info-fg)')}
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:10px;font-size:12.5px;color:var(--text-muted);line-height:1.55;">
       Below: every distinct issue found, grouped by severity. <b style="color:var(--text);">Click any card</b> to see the affected URLs in its dedicated tab.
     </div>
-    ${tier('Errors — must fix', 'error', '#ef4444')}
-    ${tier('Warnings — should fix', 'warn', '#f59e0b')}
-    ${tier('Info — intentional content states', 'info', '#0ea5e9')}
+    ${tier('Errors: must fix', 'error', 'var(--err-fg)')}
+    ${tier('Warnings: should fix', 'warn', 'var(--warn-fg)')}
+    ${tier('Info: intentional content states', 'info', 'var(--info-fg)')}
   `;
   main.appendChild(panel);
 }
@@ -3011,7 +3054,7 @@ function _scRenderSeverityPanel(cat) {
   const cardsHtml = rows.length ? `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:18px;">
       ${rows.map(r => `
-        <div onclick="selectCategory(${jsArg(r.slug)})"
+        <div role="button" tabindex="0" onclick="selectCategory(${jsArg(r.slug)})"
              style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
              onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
              onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
@@ -3056,7 +3099,7 @@ function _scRenderHreflangPanel() {
         <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px;">No hreflang declarations found</div>
         <div style="font-size:.75rem;color:var(--text-muted);line-height:1.55;">
           None of the crawled pages declare <code>&lt;link rel="alternate" hreflang="…"&gt;</code>.
-          If this site is intentionally single-language, that's fine — hreflang is only required for multi-language / multi-region content.
+          If this site is intentionally single-language, that's fine, hreflang is only required for multi-language / multi-region content.
         </div>
       </div>`;
     main.appendChild(panel);
@@ -3345,6 +3388,7 @@ window.runNearDupAnalysis = async function() {
     if (cnt) cnt.textContent = String(n);
   } catch (e) {
     console.warn('[near-dup] analysis failed:', e);
+    showToast(`Near-duplicate check failed: ${e && e.message ? e.message : 'unknown error'}`, 'error');
   }
 };
 
@@ -3372,7 +3416,7 @@ function _renderNearDupPanel() {
     const simColor = sim >= 95 ? '#dc2626' : sim >= 90 ? '#ea580c' : sim >= 85 ? '#d97706' : '#65a30d';
     const pathA = (p.url_a || '').replace(/^https?:\/\/[^\/]+/, '') || '/';
     const pathB = (p.url_b || '').replace(/^https?:\/\/[^\/]+/, '') || '/';
-    const sample = p.shared_phrase_sample || '—';
+    const sample = p.shared_phrase_sample || '-';
     return `<tr>
       <td style="font-variant-numeric:tabular-nums;font-weight:700;color:${simColor};">${sim}%</td>
       <td title="${_scEscapeHtml(p.url_a)}"><a href="${safeHref(p.url_a)}" target="_blank" rel="noopener" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathA)}</a></td>
@@ -3388,14 +3432,14 @@ function _renderNearDupPanel() {
       <span><b>${stats.docs_analysed || 0}</b> <span style="color:var(--text-muted,#64748b);">analysed</span></span>
       <span><b>${stats.docs_skipped || 0}</b> <span style="color:var(--text-muted,#64748b);">skipped</span></span>
       <span style="color:var(--text-muted,#64748b);">· took ${stats.took_ms || 0} ms</span>
-      <button type="button" onclick="runNearDupAnalysis().then(() => selectCategory('__nd_content'))" style="margin-left:auto;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;">Re-run</button>
+      <button type="button" onclick="runNearDupAnalysis().then(() => selectCategory('__nd_content'))" style="margin-left:auto;background:var(--surface,#fff);color:var(--text);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;">Re-run</button>
     </div>
     ${_scGridTable('near-dup', [
-      {label:'Sim',           width:70},
-      {label:'Page A',        width:340},
-      {label:'Page B',        width:340},
-      {label:'Shared sample'},
-      {label:'',              width:100, alignRight:true},
+      {label:'Sim',           width:64},
+      {label:'Page A',        width:240},
+      {label:'Page B',        width:240},
+      {label:'Shared sample', width:300},
+      {label:'',              width:110, alignRight:true},
     ], rowsHtml, 'font-size:.78rem;')}`;
   main.appendChild(panel);
   _scWireNestedGrids(panel);
@@ -3482,10 +3526,10 @@ function _renderSitemapPanel(cat) {
   const map = {
     '__sm_missing':    { key: 'missing_from_sitemap',     hint: 'These pages are indexable, return 200, and were reached by the crawl, but are NOT in the sitemap. Add them.' },
     '__sm_orphan':     { key: 'orphan_in_sitemap',        hint: 'In the sitemap and crawled, but no internal links point to them. Link to them from related pages.' },
-    '__sm_only':       { key: 'sitemap_only',             label: 'Orphan Pages',  hint: 'These pages are in your sitemap but no internal links point to them anywhere on the site — visitors and Google\'s crawler can\'t reach them by clicking through. For each one, decide: <b>(1)</b> Not needed? Add <code>noindex</code> or delete the page (and remove from sitemap). <b>(2)</b> Needed? Add an internal link from a relevant page, or include it in your header/footer navigation.' },
+    '__sm_only':       { key: 'sitemap_only',             label: 'Orphan Pages',  hint: 'These pages are in your sitemap but no internal links point to them anywhere on the site. Visitors and Google\'s crawler can\'t reach them by clicking through. For each one, decide: <b>(1)</b> Not needed? Add <code>noindex</code> or delete the page (and remove from sitemap). <b>(2)</b> Needed? Add an internal link from a relevant page, or include it in your header/footer navigation.' },
     '__sm_noindex':    { key: 'non_indexable_in_sitemap', hint: 'In sitemap but flagged noindex. Remove from sitemap OR remove the noindex.' },
     '__sm_non200':     { key: 'non_200_in_sitemap',       hint: 'In sitemap but the URL returns 4xx/5xx. Remove from sitemap or fix the page.' },
-    '__sm_redirects':  { key: 'redirects_in_sitemap',     hint: 'Replace with the canonical destination URL — having a 301/302 in the sitemap wastes crawl budget.' },
+    '__sm_redirects':  { key: 'redirects_in_sitemap',     hint: 'Replace with the canonical destination URL: having a 301/302 in the sitemap wastes crawl budget.' },
     '__sm_pagination': { key: 'pagination_in_sitemap',    hint: 'Google explicitly says do not include pagination URLs (/page/2/) in sitemaps.' },
   };
   const info = map[cat] || { key: '', hint: '' };
@@ -3540,10 +3584,15 @@ function renderIssueInfo(cat) {
   const sourcesHtml = meta.sources.length
     ? `<div class="sources">Sources: ${meta.sources.map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener">${escapeHtml(t)}</a>`).join(' · ')}</div>`
     : '';
+  // Heading: the name the sidebar shows for this category. Internal keys
+  // such as "__dup_titles" or "imgs missing alt" used to be printed as-is.
+  const sideEl = [...document.querySelectorAll('.ci-cat')].find(e => e.dataset.cat === cat);
+  const sideSpan = sideEl ? sideEl.querySelector('span') : null;
+  const heading = (sideSpan && sideSpan.textContent.trim()) || cat.replace(/^_+/, '').replace(/_/g, ' ');
   box.innerHTML = `<div class="info-box" style="display:flex;align-items:flex-start;gap:9px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;opacity:.7;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     <div style="flex:1;min-width:0;">
-      <div style="font-weight:700;font-size:.73rem;margin-bottom:3px;">${escapeHtml(cat)}</div>
+      <div style="font-weight:700;font-size:.73rem;margin-bottom:3px;">${escapeHtml(heading)}</div>
       <div>${escapeHtml(meta.why)}</div>
       ${sourcesHtml}
     </div>
@@ -4044,6 +4093,105 @@ function _buildExportForCategory(cat) {
     return { header: ['Group', valLabel, 'Pages in Group', 'URL'], rows };
   }
 
+  // The report tabs below render from their own data, not from
+  // matchesCategory, so the default branch found no rows for them and their
+  // Export view button never appeared.
+
+  // All Titles / Metas / H1s / Canonicals: one row per page with its value.
+  if (cat === '__all_titles' || cat === '__all_metas' || cat === '__all_h1s' || cat === '__all_canonicals') {
+    const spec = {
+      '__all_titles':     { field: 'title',            label: 'Title' },
+      '__all_metas':      { field: 'meta_description', label: 'Meta Description' },
+      '__all_h1s':        { field: 'h1',               label: 'H1' },
+      '__all_canonicals': { field: 'canonical',        label: 'Canonical' },
+    }[cat];
+    const rows = crawlerResults
+      .filter(r => !r.is_pagination)
+      .map(r => { const v = r[spec.field] || ''; return [r.url || '', v, v.length, r.status_code || '']; });
+    return { header: ['URL', spec.label, 'Length', 'Status'], rows };
+  }
+
+  // JS vs non-JS: rendered value next to the raw-HTML value for each field.
+  if (cat === '__js_diff') {
+    const rows = [];
+    for (const r of crawlerResults) {
+      if (!r || !r.js_diff) continue;
+      const sev = r.js_diff.severity;
+      if (!sev || sev === 'none') continue;
+      const nojs = r.non_js || {};
+      rows.push([
+        r.url || '', sev, (r.js_diff.fields || []).join(', '),
+        r.title || '', nojs.title || '',
+        r.meta_description || '', nojs.meta_description || '',
+        r.h1 || '', nojs.h1 || '',
+        r.word_count || 0, nojs.word_count || 0,
+        (r.schema_types || []).join('|'), (nojs.schema_types || []).join('|'),
+        r.internal_links || 0, nojs.internal_links_count || 0,
+      ]);
+    }
+    return {
+      header: ['URL', 'Severity', 'Fields differing', 'Title (rendered)', 'Title (no JS)',
+               'Meta (rendered)', 'Meta (no JS)', 'H1 (rendered)', 'H1 (no JS)',
+               'Words (rendered)', 'Words (no JS)', 'Schema (rendered)', 'Schema (no JS)',
+               'Internal links (rendered)', 'Internal links (no JS)'],
+      rows,
+    };
+  }
+
+  // Redirect chains (2+ hops), hop by hop.
+  if (cat === '__redir_chains') {
+    const chains = ((window.crawlerReports || {}).redirect_chains) || [];
+    const rows = chains.map(c => [
+      c.url || '',
+      c.hops || 0,
+      (c.chain || []).map(h => `[${h.status}] ${h.url}`).join(' > '),
+    ]);
+    return { header: ['Starting URL', 'Hops', 'Chain'], rows };
+  }
+
+  // Soft 404 / URL trap probes.
+  if (cat === '__traps') {
+    const tc = ((window.crawlerReports || {}).url_traps) || {};
+    const rows = (tc.probes || []).map(pr => [
+      pr.kind === 'root' ? 'Soft 404 (root)' : 'Infinite URL space (nested)',
+      pr.url || '',
+      pr.status != null ? pr.status : (pr.error || ''),
+      pr.status === 200 ? 'Fail: serves content for a URL that does not exist' : 'OK: refused',
+      pr.serves || '',
+    ]);
+    return { header: ['Probe', 'URL requested', 'Status', 'Verdict', 'Note'], rows };
+  }
+
+  // Response codes: one row per page, sorted by status, so the sheet can be
+  // filtered by code (the panel shows the distribution).
+  if (cat === '__response_codes') {
+    const rows = crawlerResults
+      .map(r => [r.status_code || 0, r.url || '', r.title || '', r.redirect_url || ''])
+      .sort((a, b) => a[0] - b[0]);
+    return { header: ['Status', 'URL', 'Title', 'Redirects to'], rows };
+  }
+
+  // Deep pages: 4+ clicks from the home page, deepest first.
+  if (cat === '__deep') {
+    const rows = crawlerResults
+      .filter(r => (r.depth || 0) >= 4)
+      .sort((a, b) => (b.depth || 0) - (a.depth || 0))
+      .map(r => [r.url || '', r.depth || 0, r.status_code || '', r.title || '',
+                 (_scLookupInlinks(r.url) || []).length]);
+    return { header: ['URL', 'Clicks from home', 'Status', 'Title', 'Inlinks'], rows };
+  }
+
+  // Hreflang: one row per (page, alternate) declaration.
+  if (cat === '__hreflang') {
+    const rows = [];
+    for (const r of crawlerResults) {
+      for (const e of (r.hreflang || [])) {
+        if (e && (e.lang || e.href)) rows.push([r.url || '', e.lang || '', e.href || '']);
+      }
+    }
+    return { header: ['Page URL', 'Hreflang', 'Alternate URL'], rows };
+  }
+
   // Default: page-level summary using matchesCategory.
   const filtered = (cat === 'all')
     ? crawlerResults.slice()
@@ -4138,7 +4286,7 @@ async function exportCrawlerView() {
 
 async function exportCrawlerXlsx() {
   if (!crawlerResults.length) return;
-  const btn = document.getElementById('crawler-export-xlsx-btn');
+  const btn = document.getElementById('topbar-export-xlsx');
   const lbl = btn ? btn.querySelector('span') : null;
   if (btn) { btn.disabled = true; if (lbl) lbl.textContent = 'Exporting…'; }
   try {
@@ -4153,6 +4301,20 @@ async function exportCrawlerXlsx() {
       // redirected target) so users can fix the link AND know the anchor text.
       ['HTTP',            '4xx-5xx Inlinks'],
       ['Redirect',        'Redirect Inlinks'],
+      // Report tabs. Each sheet is only added when it has rows.
+      ['__redir_chains',  'Redirect Chains'],
+      ['__dup_titles',    'Duplicate Titles'],
+      ['__dup_metas',     'Duplicate Metas'],
+      ['__dup_h1s',       'Duplicate H1s'],
+      ['__dup_bodies',    'Duplicate Bodies'],
+      ['__deep',          'Deep Pages'],
+      ['__hreflang',      'Hreflang'],
+      ['__traps',         'Soft 404 Probes'],
+      ['__sm_missing',    'Missing From Sitemap'],
+      ['__sm_only',       'In Sitemap Not Crawled'],
+      ['__sm_non200',     'Non-200 In Sitemap'],
+      ['__sm_redirects',  'Redirects In Sitemap'],
+      ['__sm_noindex',    'Noindex In Sitemap'],
     ];
     for (const [cat, name] of cats) {
       try {
@@ -4209,7 +4371,7 @@ async function exportCrawlerXlsx() {
     a.click();
     URL.revokeObjectURL(a.href);
     const totalRows = extraSheets.reduce((n, s) => n + s.rows.length, 0);
-    try { showToast(`Exported crawl — ${extraSheets.length} extra sheet${extraSheets.length===1?'':'s'} (${totalRows} rows)`, 'success'); } catch {}
+    try { showToast(`Exported crawl: ${extraSheets.length} extra sheet${extraSheets.length===1?'':'s'} (${totalRows} rows)`, 'success'); } catch {}
   } catch (e) {
     console.error('[exportCrawlerXlsx]', e);
     try { showToast('Export failed: ' + e.message, 'error'); } catch {}
@@ -4223,7 +4385,7 @@ async function exportCrawlerXlsx() {
 // accurate URL count *before* the download triggers.
 async function exportCrawlerSitemap() {
   if (!Array.isArray(crawlerResults) || !crawlerResults.length) return;
-  const btn = document.getElementById('crawler-export-sitemap-btn');
+  const btn = document.getElementById('topbar-export-sitemap');
   if (!btn) return;
   let domain = '';
   try { domain = new URL(crawlerResults[0].url).origin; } catch {}
@@ -4261,7 +4423,7 @@ async function exportCrawlerSitemap() {
     // extension from the response's Content-Type.
     const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
     const ext = ct.includes('zip') ? 'zip' : 'xml';
-    const safeDomain = (domain || '').replace(/^https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '');
+    const safeDomain = (domain || '').replace(/^https?:\/\//, '').replace(/:/g, '-').replace(/[^a-zA-Z0-9.-]/g, '');
     const ts = new Date().toISOString().slice(0, 16).replace('T', '-').replace(':', '');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -4291,10 +4453,6 @@ function crawlFinished() {
   if (queuedEl) queuedEl.textContent = '0';
   // Show sitemap export button now that the crawl has produced results.
   if (Array.isArray(crawlerResults) && crawlerResults.length) {
-    const _smBtn = document.getElementById('crawler-export-sitemap-btn');
-    if (_smBtn) _smBtn.style.display = 'inline-flex';
-    const _xBtn = document.getElementById('crawler-export-xlsx-btn');
-    if (_xBtn) _xBtn.style.display = 'inline-flex';
     const _t1 = document.getElementById('topbar-export-sitemap');
     if (_t1) _t1.style.display = 'inline-flex';
     const _t2 = document.getElementById('topbar-export-xlsx');
@@ -4349,7 +4507,7 @@ async function crawlerFetchRobots() {
       return;
     }
     if (d.status >= 400) {
-      out.value = `# ${d.url} returned HTTP ${d.status} — site has no robots.txt or it's blocked.`;
+      out.value = `# ${d.url} returned HTTP ${d.status}: site has no robots.txt or it's blocked.`;
       if (status) status.textContent = `HTTP ${d.status}`;
       return;
     }
@@ -4393,7 +4551,7 @@ function applyCrawlRules() {
     }
     const ex = (body.exclude || []).length;
     const inc = (body.include || []).length;
-    if (msg) { msg.textContent = `Applied — ${ex} exclude, ${inc} include rule${(ex+inc)===1?'':'s'} active.`; msg.style.color = '#059669'; }
+    if (msg) { msg.textContent = `Applied: ${ex} exclude, ${inc} include rule${(ex+inc)===1?'':'s'} active.`; msg.style.color = '#059669'; }
   }).catch(() => {
     if (msg) { msg.textContent = 'Network error.'; msg.style.color = '#dc2626'; }
   });
@@ -4630,7 +4788,7 @@ function _scRedirectStatusMeta(code) {
 function _scRedirToCell(d) {
   const to = d.redirect_url || '';
   const hops = d.redirect_hops || 0;
-  if (!to) return '<td data-col="redirto"><em style="color:#94a3b8">—</em></td>';
+  if (!to) return '<td data-col="redirto"><em style="color:#94a3b8">-</em></td>';
   const safe = escapeHtml(to);
   const rs = _scRedirectStatus(d);
   const m = _scRedirectStatusMeta(rs);
@@ -4653,7 +4811,7 @@ function _scH1Cells(d) {
     const cells = [];
     for (let i = 0; i < _scMultiH1N; i++) {
       const v = list[i];
-      cells.push(`<td data-col="h1" title="${escapeHtml(v||'')}">${v ? escapeHtml(v) : '<em style="color:#94a3b8">—</em>'}</td>`);
+      cells.push(`<td data-col="h1" title="${escapeHtml(v||'')}">${v ? escapeHtml(v) : '<em style="color:#94a3b8">-</em>'}</td>`);
     }
     return cells.join('');
   }
@@ -4810,7 +4968,7 @@ function _scSetColumns(cat) {
     // and the async rejection lost the user-gesture context, so the textarea
     // fallback only ever wrote a single line on some browsers.
     const copyText = (text, ok, fail) => {
-      const done = (success) => scToast(success ? ok : (fail || 'Copy failed — clipboard blocked.'));
+      const done = (success) => scToast(success ? ok : (fail || 'Copy failed: clipboard blocked.'));
       let copied = false;
       try {
         const ta = document.createElement('textarea');
@@ -4880,7 +5038,7 @@ if (typeof window.showToast !== 'function') {
 
 function saveCurrentCrawl() {
   if (!crawlerResults || !crawlerResults.length) {
-    showToast('Nothing to save yet — run a crawl first.', 'error');
+    showToast('Nothing to save yet: run a crawl first.', 'error');
     return;
   }
   const defaultName = (crawlerResults[0].url || '').replace(/^https?:\/\//,'').replace(/\/$/,'');
@@ -4909,7 +5067,7 @@ function openCrawlLoader(opts) {
   fetch('/crawl/list').then(r => r.json()).then(d => {
     const crawls = d.crawls || [];
     if (!crawls.length) {
-      body.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;font-size:13px;">No saved crawls in the last 30 days. Every crawl auto-saves — run one and it will appear here.</div>';
+      body.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;font-size:13px;">No saved crawls in the last 30 days. Every crawl auto-saves: run one and it will appear here.</div>';
       return;
     }
     let headerNote;
@@ -4919,7 +5077,7 @@ function openCrawlLoader(opts) {
         : `<div style="padding:10px 14px;font-size:12px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;margin:10px 14px;">Run or load a crawl first, then come back here to compare.</div>`;
     } else {
       headerNote = hasCurrent
-        ? `<div style="padding:10px 14px;font-size:11px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">Showing last 30 days · Current crawl loaded (${crawlerResults.length} pages) — use <strong>Compare</strong> to diff against any saved crawl.</div>`
+        ? `<div style="padding:10px 14px;font-size:11px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">Showing last 30 days · Current crawl loaded (${crawlerResults.length} pages): use <strong>Compare</strong> to diff against any saved crawl.</div>`
         : `<div style="padding:10px 14px;font-size:11px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">Showing last 30 days · Load a crawl to view it, then open this list again to compare.</div>`;
     }
     const search = `
@@ -5011,9 +5169,42 @@ function closeCrawlLoader() {
   document.body.style.overflow = '';
 }
 
+// A loaded crawl looks exactly like a fresh one, so say when it was saved,
+// and warn once it is old enough that the site has probably changed.
+function _scSavedCrawlTs(file, savedAt) {
+  if (savedAt) return savedAt;
+  const m = /^(\d{9,11})_/.exec(file || '');
+  return m ? parseInt(m[1], 10) : null;
+}
+function _scShowSavedCrawlNotice(file, name, savedAt) {
+  const anchorEl = document.getElementById('crawler-cms-banner');
+  if (!anchorEl || !anchorEl.parentNode) return;
+  let el = document.getElementById('crawler-saved-notice');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'crawler-saved-notice';
+    anchorEl.parentNode.insertBefore(el, anchorEl);
+  }
+  const ts = _scSavedCrawlTs(file, savedAt);
+  if (!ts) { el.style.display = 'none'; return; }
+  const days = Math.max(0, Math.floor((Date.now() / 1000 - ts) / 86400));
+  const stale = days > 14;
+  const date = new Date(ts * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const age = days < 1 ? 'saved today' : (days === 1 ? '1 day old' : `${days} days old`);
+  el.className = 'saved-notice' + (stale ? ' stale' : '');
+  el.style.display = '';
+  el.innerHTML = `Viewing a saved crawl${name ? ` (${escapeHtml(name)})` : ''} from <b>${date}</b>, ${age}.`
+    + (stale ? ' The site may have changed since then: run a new crawl before reporting on these results.' : '');
+}
+function _scHideSavedCrawlNotice() {
+  const el = document.getElementById('crawler-saved-notice');
+  if (el) el.style.display = 'none';
+}
+
 function loadSavedCrawl(file) {
   fetch('/crawl/load?file=' + encodeURIComponent(file)).then(r => r.json()).then(d => {
     if (d.error) { showToast('Load failed: ' + d.error, 'error'); return; }
+    _scResetPerCrawlState();
     crawlerResults = d.results || [];
     crawlerInlinks = d.inlinks || {};
     window.crawlerReports = d.reports || {};
@@ -5035,14 +5226,13 @@ function loadSavedCrawl(file) {
       if (csCrawled) csCrawled.textContent = String(crawlerResults.length);
       const post = document.getElementById('crawler-post-crawl-actions');
       if (post) post.style.display = 'flex';
-      { const _smBtn = document.getElementById('crawler-export-sitemap-btn'); if (_smBtn && crawlerResults.length) _smBtn.style.display = 'inline-flex'; }
-      { const _xBtn = document.getElementById('crawler-export-xlsx-btn'); if (_xBtn && crawlerResults.length) _xBtn.style.display = 'inline-flex'; }
       { const _t = document.getElementById('topbar-export-sitemap'); if (_t && crawlerResults.length) _t.style.display = 'inline-flex'; }
       { const _t = document.getElementById('topbar-export-xlsx'); if (_t && crawlerResults.length) _t.style.display = 'inline-flex'; }
       if (typeof updateCounts === 'function') updateCounts();
       // Default to Summary on load so users see what needs fixing
       // immediately, not an opaque 500-row table.
       if (typeof window.selectCategory === 'function') window.selectCategory('__summary');
+      _scShowSavedCrawlNotice(file, d.name, d.saved_at);
       showToast(`Loaded "${d.name}" · ${crawlerResults.length} pages`, 'success');
       closeCrawlLoader();
     }, 120);
@@ -5270,8 +5460,8 @@ function _renderCompareModal(d, savedName) {
   const changedRow = (c) => {
     const fields = Object.entries(c.diffs).map(([f, v]) => {
       let oldv = v.old, newv = v.new;
-      if (f === 'body_hash') { oldv = oldv ? oldv.slice(0, 8) + '…' : '—'; newv = newv ? newv.slice(0, 8) + '…' : '—'; }
-      else { oldv = (oldv == null ? '—' : String(oldv)).slice(0, 220); newv = (newv == null ? '—' : String(newv)).slice(0, 220); }
+      if (f === 'body_hash') { oldv = oldv ? oldv.slice(0, 8) + '…' : '-'; newv = newv ? newv.slice(0, 8) + '…' : '-'; }
+      else { oldv = (oldv == null ? '-' : String(oldv)).slice(0, 220); newv = (newv == null ? '-' : String(newv)).slice(0, 220); }
       return `<div style="display:grid;grid-template-columns:120px 1fr;gap:8px;margin-top:4px;">
         <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">${FIELD_LABELS[f] || f}</div>
         <div style="font-size:12px;">
@@ -5426,7 +5616,7 @@ window._compareToggleIssueDrill = function(idx) {
         </div>
         <div style="background:#fff;">
           <div style="padding:8px 12px;font-size:10.5px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Still failing <span style="color:#64748b;font-weight:500;">(${bt})</span></div>
-          <div style="max-height:340px;overflow:auto;">${renderList(both, bt, 'None — issue cleared', '#f59e0b')}</div>
+          <div style="max-height:340px;overflow:auto;">${renderList(both, bt, 'None: issue cleared', '#f59e0b')}</div>
         </div>
       </div>
     </td>`;
@@ -5450,7 +5640,7 @@ window._compareToggleIssueDrill = function(idx) {
         String(d.getDate()).padStart(2,'0') + ' ' +
         String(d.getHours()).padStart(2,'0') + ':' +
         String(d.getMinutes()).padStart(2,'0');
-      const name = host ? `${host} — ${stamp}` : `crawl — ${stamp}`;
+      const name = host ? `${host} - ${stamp}` : `crawl - ${stamp}`;
       fetch('/crawl/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -5705,12 +5895,15 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
           <textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${_scEsc(labelText)}</textPath>
         </text>`;
     } else if (rw > 14 && angle > 0.018) {
-      // Radial label — reads from centre outward. Flip 180° on bottom/left
-      // half so letters aren't upside-down.
+      // Radial label, reading from the centre outward. Angles run clockwise
+      // from 12 o'clock, so the text is upright on the right half and upside
+      // down on the left half (6 to 12 o'clock): flip that half by 180°. The
+      // old test flipped the bottom half, which turned the lower-right labels
+      // over and left the upper-left ones upside down.
       const midAng = (arc.a0 + arc.a1) / 2;
       const [tx, ty] = polar(midR, midAng);
       const baseRot = (midAng * 180 / Math.PI) - 90;
-      const flip = midAng > Math.PI / 2 && midAng < 3 * Math.PI / 2;
+      const flip = midAng > Math.PI;
       const rot = flip ? baseRot + 180 : baseRot;
       const maxChars = Math.max(2, Math.floor((rw - 6) / 5.8));
       const labelText = arc.node.name.length > maxChars
@@ -5820,7 +6013,7 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
         <div style="min-width:0;overflow:hidden;">
           <div id="sv-readout" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;min-height:120px;overflow:hidden;">
             <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:6px;">hover a slice</div>
-            <div id="sv-readout-path" style="font-family:'SF Mono','Menlo',monospace;font-size:12px;color:#6366f1;word-break:break-all;overflow-wrap:anywhere;margin-bottom:8px;max-width:100%;">—</div>
+            <div id="sv-readout-path" style="font-family:'SF Mono','Menlo',monospace;font-size:12px;color:#6366f1;word-break:break-all;overflow-wrap:anywhere;margin-bottom:8px;max-width:100%;">-</div>
             <div id="sv-readout-stats" style="font-size:11.5px;color:#64748b;line-height:1.55;">Click a slice to drill in. Hold <kbd style="font-family:inherit;background:#fff;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;font-size:10.5px;">Shift</kbd> while clicking to filter the table to that subtree instead.</div>
           </div>
           <div style="font-size:11px;color:#64748b;line-height:1.55;">
@@ -5851,11 +6044,11 @@ function _svRenderList(pages, filter) {
     const title = p.title || p.t || '';
     const path = url.replace(/^https?:\/\/[^\/]+/, '') || '/';
     const sc = status >= 500 ? '#dc2626' : status >= 400 ? '#ef4444' : status >= 300 ? '#f59e0b' : status >= 200 ? '#22c55e' : '#94a3b8';
-    return `<div onclick="_svListClick(event, ${jsArg(url)})"
+    return `<div role="button" tabindex="0" onclick="_svListClick(event, ${jsArg(url)})"
       style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid #e2e8f0;cursor:pointer;line-height:1.4;"
       onmouseover="this.style.background='#fff'" onmouseout="this.style.background=''"
       title="${_scEsc(title || url)}">
-      <span style="color:${sc};font-weight:700;width:38px;flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums;">${status || '—'}</span>
+      <span style="color:${sc};font-weight:700;width:38px;flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums;">${status || '-'}</span>
       <span style="flex:1;min-width:0;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_scEsc(path)}</span>
       ${issues ? `<span style="color:#f59e0b;font-size:10.5px;font-weight:600;flex-shrink:0;">${issues} issue${issues===1?'':'s'}</span>` : ''}
     </div>`;
@@ -5925,23 +6118,31 @@ function _svInitPanZoom() {
     state.suppressClick = false;
     svg.style.cursor = 'grabbing';
   });
-  window.addEventListener('mousemove', (e) => {
-    if (!state.drag) return;
-    const dx = e.clientX - state.drag.sx;
-    const dy = e.clientY - state.drag.sy;
-    state.drag.moved = Math.max(state.drag.moved, Math.abs(dx), Math.abs(dy));
-    const r = svg.getBoundingClientRect();
-    state.vb.x = state.drag.vbX - dx / r.width * state.vb.w;
-    state.vb.y = state.drag.vbY - dy / r.height * state.vb.h;
-    apply();
-  });
-  window.addEventListener('mouseup', () => {
-    if (!state.drag) return;
-    if (state.drag.moved > 4) state.suppressClick = true;
-    state.drag = null;
-    svg.style.cursor = 'grab';
-    setTimeout(() => { state.suppressClick = false; }, 50);
-  });
+  // The window-level drag listeners are added once and act on whichever
+  // chart is current (window._svPZ). Adding them per chart leaked a pair on
+  // every redraw, and a live crawl redraws the chart every few seconds.
+  if (!window._svPZWindowWired) {
+    window._svPZWindowWired = true;
+    window.addEventListener('mousemove', (e) => {
+      const st = window._svPZ;
+      if (!st || !st.drag) return;
+      const dx = e.clientX - st.drag.sx;
+      const dy = e.clientY - st.drag.sy;
+      st.drag.moved = Math.max(st.drag.moved, Math.abs(dx), Math.abs(dy));
+      const r = st.svg.getBoundingClientRect();
+      st.vb.x = st.drag.vbX - dx / r.width * st.vb.w;
+      st.vb.y = st.drag.vbY - dy / r.height * st.vb.h;
+      st.svg.setAttribute('viewBox', `${st.vb.x} ${st.vb.y} ${st.vb.w} ${st.vb.h}`);
+    });
+    window.addEventListener('mouseup', () => {
+      const st = window._svPZ;
+      if (!st || !st.drag) return;
+      if (st.drag.moved > 4) st.suppressClick = true;
+      st.drag = null;
+      st.svg.style.cursor = 'grab';
+      setTimeout(() => { st.suppressClick = false; }, 50);
+    });
+  }
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
@@ -5985,7 +6186,7 @@ window._svSliceHover = function(pathStr, count, errors, issues) {
   const s = document.getElementById('sv-readout-stats');
   if (!p || !s) return;
   if (!pathStr) {
-    p.textContent = '—';
+    p.textContent = '-';
     s.innerHTML = 'Click a slice to drill in. Hold <kbd style="font-family:inherit;background:#fff;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;font-size:10.5px;">Shift</kbd> while clicking to filter the table to that subtree instead.';
     return;
   }
@@ -6116,7 +6317,7 @@ function _scRenderAnchorTextCloud() {
   const items = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 80);
   if (!items.length) {
     return `<div style="padding:32px;text-align:center;color:#64748b;font-size:13px;">
-      No anchor text captured yet. Anchor data is collected as the crawler discovers internal links — let the crawl finish, then re-open this view.
+      No anchor text captured yet. Anchor data is collected as the crawler discovers internal links, let the crawl finish, then re-open this view.
     </div>`;
   }
   const max = items[0].count;
@@ -6140,8 +6341,8 @@ function _scRenderAnchorTextCloud() {
     const color = isGeneric ? '#dc2626' : palette[i % palette.length];
     const safe = _scEsc(it.display);
     const titleAttr = isGeneric
-      ? `${safe} — generic anchor (${it.count}×). Google can't tell what the linked page is about. Rewrite to describe the destination topic.`
-      : `${safe} — used ${it.count} time${it.count===1?'':'s'} pointing to ${it.targets.size} URL${it.targets.size===1?'':'s'}`;
+      ? `${safe}: generic anchor (${it.count}×). Google can't tell what the linked page is about. Rewrite to describe the destination topic.`
+      : `${safe}: used ${it.count} time${it.count===1?'':'s'} pointing to ${it.targets.size} URL${it.targets.size===1?'':'s'}`;
     const extra = isGeneric ? `border:1px solid rgba(220,38,38,0.4);background:rgba(254,226,226,0.6);` : '';
     const badge = isGeneric ? `<span style="margin-left:5px;font-size:9.5px;font-weight:700;color:#fff;background:#dc2626;padding:1px 5px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase;">⚠</span>` : '';
     return `<span class="sv-cloud-tag" style="display:inline-block;padding:5px 10px;font-size:${fontSize}px;font-weight:${500 + Math.round(ratio*300)};color:${color};opacity:${opacity};line-height:1.25;cursor:pointer;border-radius:6px;transition:background .12s,opacity .12s;${extra}"
@@ -6153,8 +6354,8 @@ function _scRenderAnchorTextCloud() {
   const banner = genericItems.length ? `
     <div style="margin:0 0 12px;padding:11px 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.35);border-left:3px solid #ef4444;border-radius:6px;font-size:12px;color:#7f1d1d;line-height:1.5;">
       <div style="font-weight:700;color:#991b1b;margin-bottom:3px;">⚠ ${genericItems.length} generic anchor${genericItems.length===1?'':'s'} found · ${genericLinks} link${genericLinks===1?'':'s'} (${genericPct}% of internal links)</div>
-      <div>Anchors like <em>"Read more"</em>, <em>"Click here"</em>, <em>"Learn more"</em> are an SEO problem. Google uses anchor text as a topical relevance signal for the destination page — generic anchors give it nothing to work with. They also fail accessibility (screen readers announce the anchor out of context).</div>
-      <div style="margin-top:5px;"><strong>Fix:</strong> rewrite each generic anchor so it describes what the linked page is <em>about</em> — match the target page's topic / primary keyword. (e.g. "Read more →" becomes "private in-home care services →".)</div>
+      <div>Anchors like <em>"Read more"</em>, <em>"Click here"</em>, <em>"Learn more"</em> are an SEO problem. Google uses anchor text as a topical relevance signal for the destination page, generic anchors give it nothing to work with. They also fail accessibility (screen readers announce the anchor out of context).</div>
+      <div style="margin-top:5px;"><strong>Fix:</strong> rewrite each generic anchor so it describes what the linked page is <em>about</em>: match the target page's topic / primary keyword. (e.g. "Read more →" becomes "private in-home care services →".)</div>
     </div>` : '';
 
   return `
@@ -6198,7 +6399,7 @@ function scShowView(view) {
   function render(res) {
     document.getElementById('cb-results').style.display = 'block';
     document.getElementById('cb-summary').innerHTML =
-      stat('Real pages (sitemap)', res.real_count ? res.real_count.toLocaleString() : '—') +
+      stat('Real pages (sitemap)', res.real_count ? res.real_count.toLocaleString() : '-') +
       stat('Pages scanned', res.pages_scanned) +
       stat('Trap parameters', res.trap_count, res.trap_count ? '#dc2626' : '#059669') +
       stat('Params found', res.params.length);
@@ -6206,13 +6407,13 @@ function scShowView(view) {
     const paramsEl = document.getElementById('cb-params');
     const robotsEl = document.getElementById('cb-robots');
     if (!res.params.length) {
-      paramsEl.innerHTML = `<div class="cb-card" style="text-align:center;color:#059669;font-weight:600;">✓ No URL-parameter traps found — your pages map cleanly to ${res.real_count ? res.real_count.toLocaleString() : 'the'} sitemap URLs.</div>`;
+      paramsEl.innerHTML = `<div class="cb-card" style="text-align:center;color:#059669;font-weight:600;">✓ No URL-parameter traps found: your pages map cleanly to ${res.real_count ? res.real_count.toLocaleString() : 'the'} sitemap URLs.</div>`;
       robotsEl.innerHTML = '';
       return;
     }
     const rows = res.params.map(p => {
       const color = TYPE_COLORS[p.type] || '#64748b';
-      const depth = p.max_num >= 2 ? `up to page ${p.max_num.toLocaleString()}` : '—';
+      const depth = p.max_num >= 2 ? `up to page ${p.max_num.toLocaleString()}` : '-';
       const ex = (p.examples[0] || '').replace(/^https?:\/\/[^/]+/, '');
       return `<tr>
         <td style="font-family:monospace;font-size:12px;font-weight:600;">?${esc(p.key)}</td>
@@ -6232,14 +6433,14 @@ function scShowView(view) {
           <th>Depth</th><th>Example</th><th style="text-align:center;">Action</th>
         </tr></thead><tbody>${rows}</tbody>
       </table>
-      <div class="cb-note">"URLs seen" is from a ${res.pages_scanned}-page sample — the live count across the whole site is typically far higher. "Depth" shows the highest page number a single listing links to.</div>`;
+      <div class="cb-note">"URLs seen" is from a ${res.pages_scanned}-page sample: the live count across the whole site is typically far higher. "Depth" shows the highest page number a single listing links to.</div>`;
 
     if (res.robots_block) {
       robotsEl.innerHTML = `
-        <div class="cb-robots-head"><h3>robots.txt — add these rules</h3>
+        <div class="cb-robots-head"><h3>robots.txt: add these rules</h3>
           <button id="cb-copy-btn" type="button" class="cb-copy-btn">Copy</button></div>
         <pre class="cb-pre">${esc(res.robots_block)}</pre>
-        <div class="cb-note">Add these to your site's <code>/robots.txt</code> (merge into the existing <code>User-agent: *</code> block if you have one). Re-crawl after — the queue should track your real page count instead of exploding.</div>`;
+        <div class="cb-note">Add these to your site's <code>/robots.txt</code> (merge into the existing <code>User-agent: *</code> block if you have one). Re-crawl after: the queue should track your real page count instead of exploding.</div>`;
       const cp = document.getElementById('cb-copy-btn');
       if (cp) cp.addEventListener('click', () => {
         navigator.clipboard.writeText(res.robots_block).then(
@@ -6258,7 +6459,7 @@ function scShowView(view) {
     const url = (input.value || '').trim();
     if (!url) { status.textContent = 'Enter a URL first.'; return; }
     btn.disabled = true;
-    status.textContent = 'Scanning homepage and section pages… (10–20s)';
+    status.textContent = 'Scanning homepage and section pages… (10-20s)';
     document.getElementById('cb-results').style.display = 'none';
     try {
       const r = await fetch('/crawl-budget/analyze', {

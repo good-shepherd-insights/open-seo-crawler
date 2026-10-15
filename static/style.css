@@ -11,6 +11,13 @@
      Apply, Analyse) and ci-count badges pass WCAG body. */
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  /* Status text colours. Bright on the dark surfaces; the light theme
+     swaps in deeper shades, because amber and green text on white fall to
+     about 2:1 contrast and are hard to read. */
+  --ok-fg: #22c55e;
+  --warn-fg: #f59e0b;
+  --err-fg: #ef4444;
+  --info-fg: #38bdf8;
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -22,6 +29,10 @@
     --text-muted: #64748b;
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
+    --ok-fg: #15803d;
+    --warn-fg: #b45309;
+    --err-fg: #dc2626;
+    --info-fg: #0369a1;
   }
 }
 /* Explicit theme overrides — JS toggle sets [data-theme] on <html>,
@@ -35,6 +46,10 @@
   --text-muted: #64748b;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  --ok-fg: #15803d;
+  --warn-fg: #b45309;
+  --err-fg: #dc2626;
+  --info-fg: #0369a1;
 }
 [data-theme="dark"] {
   --bg: #0f172a;
@@ -45,6 +60,10 @@
   --text-muted: #94a3b8;
   --accent: #3b82f6;
   --accent-hover: #2563eb;
+  --ok-fg: #22c55e;
+  --warn-fg: #f59e0b;
+  --err-fg: #ef4444;
+  --info-fg: #38bdf8;
 }
 .theme-toggle {
   margin-left: 8px;
@@ -387,8 +406,8 @@ body {
   min-width: 24px;
   text-align: right;
 }
-.ci-count.err { color: #ef4444; }
-.ci-count.warn { color: #f59e0b; }
+.ci-count.err { color: var(--err-fg); }
+.ci-count.warn { color: var(--warn-fg); }
 
 /* Severity-coded checks that came back clean (count = 0) get tagged
    data-clean="true" by the sort logic. Render a green tick instead of "0". */
@@ -476,9 +495,9 @@ body {
 .sev-cell.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .sev-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
 .sev-num { font-size: 14px; font-weight: 700; }
-.sev-lbl.err, .sev-num.err { color: #ef4444; }
-.sev-lbl.warn, .sev-num.warn { color: #f59e0b; }
-.sev-lbl.info, .sev-num.info { color: #3b82f6; }
+.sev-lbl.err, .sev-num.err { color: var(--err-fg); }
+.sev-lbl.warn, .sev-num.warn { color: var(--warn-fg); }
+.sev-lbl.info, .sev-num.info { color: var(--info-fg); }
 
 /* Main content — flex column: banner/info/results/dock stack, table scrolls inside results */
 .main { overflow: hidden; padding: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -569,9 +588,9 @@ body.is-col-resizing * { cursor: col-resize !important; }
   margin: 1px;
   font-weight: 600;
 }
-.badge.error { background: rgba(239,68,68,.15); color: #ef4444; }
-.badge.warn  { background: rgba(245,158,11,.15); color: #f59e0b; }
-.badge.info  { background: rgba(59,130,246,.15); color: #3b82f6; }
+.badge.error { background: rgba(239,68,68,.15); color: var(--err-fg); }
+.badge.warn  { background: rgba(245,158,11,.15); color: var(--warn-fg); }
+.badge.info  { background: rgba(59,130,246,.15); color: var(--info-fg); }
 
 /* CMS banner + issue info */
 #crawler-cms-banner, #issue-info-box { padding: 10px 14px; }
@@ -992,3 +1011,105 @@ tbody:has(tr[data-url]) { user-select: none; }
   margin-bottom: 8px;
 }
 #crawler-user-agent-custom:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.18); }
+
+/* Empty state for a table category with no matching pages */
+#crawler-tbody tr.sc-empty-row td {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: default;
+  border-bottom: 0;
+}
+
+/* Report tables (.crawler-grid): headers line up with their left-aligned
+   cells (a bare <th> is centred by the browser), rows get the same rule
+   lines as the main table, and the column resize handle is visible. */
+.crawler-grid { width: 100%; border-collapse: collapse; }
+.crawler-grid thead th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0;
+  border-bottom: 2px solid var(--border);
+  user-select: none;
+}
+.crawler-grid thead th .th-label { display: block; padding: 6px 10px 6px 8px; }
+.crawler-grid thead th .th-label.th-center { text-align: center; }
+.crawler-grid td { padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.crawler-grid thead th .th-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+}
+.crawler-grid thead th .th-resize::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  right: 0;
+  width: 1px;
+  background: var(--border);
+}
+.crawler-grid thead th .th-resize:hover::after,
+.crawler-grid thead th .th-resize.is-dragging::after { background: var(--accent); width: 3px; }
+
+/* Keep the Export view label on one line next to long report titles */
+#crawler-export-view-btn { white-space: nowrap; flex-shrink: 0; }
+
+/* Site Structure panel: its markup carries light-theme colours inline
+   (white chart area, pale readout card, near-black headings), which left a
+   bright island in dark mode with an invisible "How to read" heading. Map
+   those inline colours onto the theme variables in dark mode. */
+[data-theme="dark"] #sitestructure-panel [style*="background:#fff"],
+[data-theme="dark"] #sitestructure-panel [style*="background:#f8fafc"],
+[data-theme="dark"] #sitestructure-panel [style*="background:#f1f5f9"],
+[data-theme="dark"] #sitestructure-panel [style*="background: rgb(255, 255, 255)"] {
+  background: var(--surface) !important;
+}
+[data-theme="dark"] #sitestructure-panel [style*="background:#e2e8f0"] { background: var(--surface2) !important; }
+[data-theme="dark"] #sitestructure-panel [style*="color:#0f172a"],
+[data-theme="dark"] #sitestructure-panel [style*="color:#1e293b"],
+[data-theme="dark"] #sitestructure-panel [style*="color:#334155"],
+[data-theme="dark"] #sitestructure-panel [style*="color: rgb(15, 23, 42)"] {
+  color: var(--text) !important;
+}
+/* Hover handlers rewrite these inline values, and the browser stores them
+   as rgb(), so both spellings are listed. */
+[data-theme="dark"] #sitestructure-panel [style*="#e2e8f0"],
+[data-theme="dark"] #sitestructure-panel [style*="rgb(226, 232, 240)"] { border-color: var(--border) !important; }
+[data-theme="dark"] #sitestructure-panel input {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+/* Visible keyboard focus. Several inputs and click targets set
+   outline:none inline and had no focus style at all. */
+#sc-url-search:focus-visible, #crawl-loader-search:focus-visible, #sv-search:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+[role="button"]:focus-visible, .ci-cat:focus-visible, .url-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+/* "Viewing a saved crawl from ..." strip above the results */
+.saved-notice {
+  margin: 8px 14px 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.saved-notice b { color: var(--text); }
+.saved-notice.stale { border-color: var(--warn-fg); background: rgba(245, 158, 11, .08); color: var(--warn-fg); }
+.saved-notice.stale b { color: var(--warn-fg); }
