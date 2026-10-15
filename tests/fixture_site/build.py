@@ -87,7 +87,18 @@ def build(base='http://127.0.0.1:8099'):
         '<a href="/gone/">A page that 404s</a> '
         '<a href="/old-url/">A page that redirects</a> '
         '<a href="/noindex-target/">A noindex page</a> '
-        '<a href="/accents/">Accented title</a></p>',
+        '<a href="/accents/">Accented title</a> '
+        # Bot readability pages: serve.py answers some crawler user agents
+        # differently, which is the fault each one carries.
+        '<a href="/bot-blocked/">Blocked for one bot</a> '
+        '<a href="/bot-cloaked/">Different title for one bot</a> '
+        '<a href="/bot-thin/">Thin for one bot</a> '
+        '<a href="/bot-mobile-thin/">Thin on mobile</a> '
+        '<a href="/bot-redirect/">Redirect for one bot</a> '
+        '<a href="/bot-noindex/">noindex for one bot</a> '
+        '<a href="/bot-js/">Needs JavaScript</a> '
+        '<a href="/bot-noindex-js/">noindex removed by JavaScript</a> '
+        '<a href="/bot-ai-directives/">AI directives</a></p>',
         head=f'<title>Fixture home</title><meta name="description" content="A home page for the fault fixture site, long enough not to be flagged as short by the meta description check.">{canonical(base + "/")}'))
 
     write('/clean-second/', page(
@@ -214,6 +225,33 @@ def build(base='http://127.0.0.1:8099'):
           f'{canonical(base + "/accents/")}</head><body>{NAV}<h1>Crème brûlée</h1><p>'
           + ('Du texte ordinaire avec des accents: é, è, ê, ç, à. ' * 30) + '</p></body></html>')
 
+    # Bot readability pages. The HTML is ordinary; serve.py varies the
+    # response by user agent.
+    words = ('Plain sentences about widgets and how they are made. ' * 30)
+    for path, title in (('/bot-blocked/', 'Blocked for one bot'),
+                        ('/bot-cloaked/', 'The same title for everyone'),
+                        ('/bot-thin/', 'Thin for one bot'),
+                        ('/bot-mobile-thin/', 'Thin on mobile'),
+                        ('/bot-redirect/', 'Redirect for one bot')):
+        write(path, page(f'{NAV}<h1>{title}</h1><p>{words}</p>',
+                         head=f'<title>{title}</title><meta name="description" content="A bot readability fixture page with enough words to compare.">{canonical(base + path)}'))
+    write('/bot-noindex/', page(f'{NAV}<h1>noindex for Googlebot only</h1><p>{words}</p>',
+                                head=f'<title>noindex for Googlebot only</title><meta name="googlebot" content="noindex">{canonical(base + "/bot-noindex/")}'))
+    # Content written by script: the raw HTML has an empty shell.
+    write('/bot-js/', page(
+        f'{NAV}<h1>Needs JavaScript</h1><div id="app"></div>'
+        '<script>document.getElementById("app").innerHTML = "<p>" + '
+        '"Words that only exist after the script runs. ".repeat(40) + "</p>";</script>',
+        head=f'<title>Needs JavaScript</title>{canonical(base + "/bot-js/")}'))
+    # noindex in the HTML that a script removes: Google may never run it.
+    write('/bot-noindex-js/', page(
+        f'{NAV}<h1>noindex removed by JavaScript</h1><p>{words}</p>'
+        '<script>var m = document.querySelector("meta[name=robots]"); if (m) m.remove();</script>',
+        head=f'<title>noindex removed by JavaScript</title><meta name="robots" content="noindex">{canonical(base + "/bot-noindex-js/")}'))
+    write('/bot-ai-directives/', page(
+        f'{NAV}<h1>AI directives</h1><p>{words}</p><p data-nosnippet>Kept out of snippets.</p>',
+        head=f'<title>AI directives page</title><meta name="robots" content="noarchive, nocache, max-snippet:20">{canonical(base + "/bot-ai-directives/")}'))
+
     # A page only the sitemap knows about, for the sitemap-only report.
     write('/sitemap-only/', page(
         f'{NAV}<h1>Only in the sitemap</h1><p>' + ('Copy here. ' * 40) + '</p>',
@@ -232,7 +270,9 @@ def build(base='http://127.0.0.1:8099'):
                  + '</urlset>\n')
 
     with open(os.path.join(OUT, 'robots.txt'), 'w', encoding='utf-8') as fh:
-        fh.write(f'User-agent: *\nAllow: /\nSitemap: {base}/sitemap.xml\n')
+        # CCBot is kept out of the bot pages, so the bot check has a robots.txt
+        # disallow to report for one crawler.
+        fh.write(f'User-agent: *\nAllow: /\n\nUser-agent: CCBot\nDisallow: /bot-\n\nSitemap: {base}/sitemap.xml\n')
 
     return OUT
 

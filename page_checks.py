@@ -238,17 +238,66 @@ def canonical_issues(result, headers, soup):
     return out
 
 
+# Directive names that carry a value after a colon, so "max-snippet: 20"
+# is not mistaken for a crawler named max-snippet.
+_XRT_VALUED = ('max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after')
+
+
+def parse_x_robots(value):
+    """X-Robots-Tag value as {crawler or None: set of directives}.
+
+    Google documents "X-Robots-Tag: googlebot: noindex, nofollow": a crawler
+    name before a colon scopes the directives after it to that crawler. The
+    unscoped directives (key None) apply to every crawler. requests joins
+    repeated headers with commas, so the scope carries on until the next
+    crawler name.
+    """
+    out = {}
+    scope = None
+    for raw in (value or '').lower().split(','):
+        tok = raw.strip()
+        if not tok:
+            continue
+        m = re.match(r'^([a-z0-9_.-]+)\s*:\s*(.*)$', tok)
+        if m and m.group(1) not in _XRT_VALUED:
+            scope = m.group(1)
+            tok = m.group(2).strip()
+            if not tok:
+                continue
+        out.setdefault(scope, set()).add(tok)
+    return out
+
+
+def x_robots_for(value, crawler=None):
+    """Directives that apply to one crawler: the unscoped ones plus its own."""
+    parsed = parse_x_robots(value)
+    got = set(parsed.get(None, set()))
+    if crawler:
+        got |= parsed.get(crawler.lower(), set())
+    return got
+
+
 def directive_issues(soup, headers, result):
-    """Robots directives beyond the plain noindex the crawler already reports."""
+    """Robots directives beyond the plain noindex the crawler already reports.
+
+    nosnippet, noarchive, nocache, max-snippet and data-nosnippet are reported
+    with the meaning their owners document for search and AI answers
+    (checked 2026-10-15): Google's AI features obey nosnippet, data-nosnippet
+    and max-snippet and ignore noarchive; Apple keeps nosnippet text out of
+    AI answers; Bing keeps a NOARCHIVE page out of Copilot answers and
+    grounding and limits a NOCACHE page to its URL, title and snippet; Amazon
+    reads noarchive as "do not train on this page".
+    """
     out = []
     parts = []
     tag = soup.find('meta', attrs={'name': re.compile(r'^robots$', re.I)})
     if tag:
         parts.append((tag.get('content') or '').lower())
     xrt = (headers.get('x-robots-tag') or '').lower()
-    if xrt:
-        parts.append(xrt)
-        if 'noindex' in xrt:
+    xrt_all = x_robots_for(xrt)
+    if xrt_all:
+        parts.append(', '.join(sorted(xrt_all)))
+        if 'noindex' in xrt_all:
             out.append('noindex in the X-Robots-Tag header')
     joined = ' '.join(parts)
     tokens = {t.strip() for chunk in joined.split(',') for t in chunk.split()}
@@ -258,9 +307,30 @@ def directive_issues(soup, headers, result):
     if 'none' in tokens:
         out.append('Robots "none" (same as noindex, nofollow)')
     if 'nosnippet' in tokens:
-        out.append('nosnippet (no text snippet in results)')
+        out.append('nosnippet (no snippet in results; Google and Apple keep the text out of AI answers)')
     if 'noarchive' in tokens:
-        out.append('noarchive (no cached copy)')
+        out.append('noarchive (Bing keeps the page out of Copilot answers; Amazon will not train on it)')
+    if 'nocache' in tokens:
+        out.append('nocache (Bing Copilot shows only the URL, title and snippet)')
+    m = re.search(r'max-snippet\s*:\s*(-?\d+)', joined)
+    if m and 0 <= int(m.group(1)) < 160:
+        out.append('max-snippet limits the text Google can show, AI answers included '
+                   f'({m.group(1)} characters)')
+    dns = len(soup.find_all(attrs={'data-nosnippet': True}))
+    if dns:
+        out.append('data-nosnippet keeps sections out of snippets and AI answers '
+                   f'({dns} section(s))')
+    # A noindex aimed at one crawler. The crawl reads the generic robots tag,
+    # so a page could look indexable here while Google or Bing drops it.
+    for meta in soup.find_all('meta'):
+        name = (meta.get('name') or '').strip().lower()
+        if name in ('googlebot', 'bingbot') and 'noindex' in (meta.get('content') or '').lower():
+            label = 'Googlebot' if name == 'googlebot' else 'Bingbot'
+            out.append(f'noindex only for {label} (meta name="{name}")')
+    scoped = parse_x_robots(xrt)
+    for name, label in (('googlebot', 'Googlebot'), ('bingbot', 'Bingbot')):
+        if 'noindex' in scoped.get(name, set()):
+            out.append(f'noindex only for {label} (X-Robots-Tag)')
     m = re.search(r'unavailable_after\s*:\s*([^,\'"]+)', joined)
     if m and _http_date_past(m.group(1)):
         out.append('unavailable_after date has passed (dropped from results)')

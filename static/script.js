@@ -111,8 +111,12 @@ const ISSUE_META = {
   'noindex in the X-Robots-Tag header': { sev: 'error', why: 'The page is excluded from the index by an HTTP header, not by anything in the HTML, which is why this one gets missed: the source looks fine. Check the server, CDN or security plugin that adds it.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
   'Conflicting robots directives': { sev: 'error', why: 'The page asks to be indexed and not indexed at once. Google resolves a conflict in favour of the more restrictive rule, so noindex wins and the page disappears. Decide which one was meant.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
   'Robots "none"': { sev: 'error', why: 'none is shorthand for noindex plus nofollow, so the page is excluded from search and its links pass nothing. Almost always copied in by mistake.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
-  'nosnippet': { sev: 'warn', why: 'Google shows the result with no description text at all, which cuts click-through hard. Only worth keeping on pages you do not want quoted.', sources: [['Google - Snippets', 'https://developers.google.com/search/docs/appearance/snippet']] },
-  'noarchive': { sev: 'info', why: 'Stops Google offering a cached copy. No ranking effect, and Google retired the cache link in 2024, so this rarely matters now.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
+  'nosnippet': { sev: 'warn', why: 'Google shows the result with no description text at all, which cuts click-through hard, and keeps the page text out of its AI features. Apple also keeps nosnippet text out of AI answers. Only worth keeping on pages you do not want quoted.', sources: [['Google - Snippets', 'https://developers.google.com/search/docs/appearance/snippet'], ['Google - AI features', 'https://developers.google.com/search/docs/appearance/ai-features'], ['Apple - Applebot', 'https://support.apple.com/en-us/119829']] },
+  'noarchive': { sev: 'info', why: 'Google ignores noarchive now. Bing does not: a NOARCHIVE page is kept out of Copilot answers and grounding, and Amazon reads noarchive as "do not use this page to train models". Fine if that is the intent, a quiet loss of AI visibility if it is a theme or plugin default.', sources: [['Bing - Webmaster guidelines', 'https://www.bing.com/webmasters/help/webmaster-guidelines-30fba23a'], ['Amazon - Amazonbot', 'https://developer.amazon.com/amazonbot'], ['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
+  'nocache': { sev: 'info', why: 'Bing reads NOCACHE as "Copilot may show only the URL, title and snippet", so the page cannot be quoted in Copilot answers. Google does not use it.', sources: [['Bing - Webmaster guidelines', 'https://www.bing.com/webmasters/help/webmaster-guidelines-30fba23a']] },
+  'max-snippet limits the text Google can show, AI answers included': { sev: 'info', why: 'Google honours max-snippet in search results and in its AI features, so a low limit shortens what can be quoted. max-snippet:-1 means no limit.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag'], ['Google - AI features', 'https://developers.google.com/search/docs/appearance/ai-features']] },
+  'data-nosnippet keeps sections out of snippets and AI answers': { sev: 'info', why: 'Text inside elements marked data-nosnippet is left out of Google snippets and AI features. Check the marked sections are the ones you mean to hide.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
+  '__bots': { sev: 'warn', why: 'A sample of pages is requested as a browser and as each crawler that publishes its user agent, then compared: blocks and challenges, redirects, title, H1, canonical, noindex and the text itself. Googlebot, Bingbot and Applebot run JavaScript; most AI crawlers do not say they do, so they are judged on the raw HTML, and the pages are also rendered to measure what only exists after JavaScript runs. Serving crawlers materially different content can count as cloaking.', sources: [['Google - JavaScript SEO basics', 'https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics'], ['Google - Spam policies (cloaking)', 'https://developers.google.com/search/docs/essentials/spam-policies'], ['Bing - Webmaster guidelines', 'https://www.bing.com/webmasters/help/webmaster-guidelines-30fba23a'], ['Cloudflare - Verified bots', 'https://developers.cloudflare.com/bots/concepts/bot/verified-bots/']] },
   'unavailable_after date has passed': { sev: 'error', why: 'The page carries a date that has already gone by, so Google drops it from results. Usually left over from a campaign or an event page. Remove the directive if the page should stay.', sources: [['Google - Robots meta tag', 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag']] },
   'soft 404': { sev: 'error', why: 'The URL answers 200 OK while the page itself says the content is gone, which is what an empty category or a mistyped path usually produces. Google treats these as soft 404s and drops them, and every mistyped URL becomes another indexable duplicate. Return a real 404 or 410, or redirect to the page that replaced it.', sources: [['Google - HTTP status codes', 'https://developers.google.com/search/docs/crawling-indexing/http-network-errors']] },
   'Title may truncate in results': { sev: 'warn', why: 'Google cuts desktop titles near 580 pixels, not at a character count, so a title of wide characters clips while a short count looks fine. The figure is an estimate from an Arial width table: treat it as a nudge to put the distinguishing words first, not as an error.', sources: [['Google - Title links', 'https://developers.google.com/search/docs/appearance/title-link']] },
@@ -166,10 +170,10 @@ const ISSUE_META = {
 // Error tier: a directive a browser moves out of head is ignored by Google,
 // and a malformed canonical hands the page to a URL that does not exist.
 // Both silently undo whatever the tag meant to say.
-const _PAGE_CHECK_ERR_RE = /^(title|canonical|meta robots) outside head|^unavailable_after|^canonical is malformed|^multiple conflicting canonicals|^canonical conflict|^soft 404|^noindex in the x-robots-tag|^conflicting robots directives|^robots "none"|^lorem ipsum placeholder|^\d+ link\(s\) to a local or staging host|^\d+ form\(s\) submit over http|^no <head> element|^canonical points to a non-200|^canonical points to a non-indexable/;
+const _PAGE_CHECK_ERR_RE = /^(title|canonical|meta robots) outside head|^unavailable_after|^canonical is malformed|^multiple conflicting canonicals|^canonical conflict|^soft 404|^noindex in the x-robots-tag|^conflicting robots directives|^robots "none"|^lorem ipsum placeholder|^\d+ link\(s\) to a local or staging host|^\d+ form\(s\) submit over http|^no <head> element|^canonical points to a non-200|^canonical points to a non-indexable|^(search|ai search|ai assistant) bot (blocked|challenged):|^noindex only for |^noindex in the html is removed by javascript/;
 // Warning tier: real faults, but they cost visibility rather than removing
 // the page from the index.
-const _PAGE_CHECK_WARN_RE = /^multiple (title tags|canonical tags|meta descriptions|viewport tags|head elements|body elements)|^canonical (points to http|is a relative url|points to another host|only in the http header)|^noindex plus a canonical|^meta description outside head|^no compression|^paginated page|hreflang|^no lang attribute|^invalid lang attribute|^html lang|^h1 too long|may truncate in results|point to http|on-page anchor\(s\) point to nothing|^no doctype|^no charset declared|^charset is |^nosnippet|^canonical contains a fragment|^canonical points to a url that redirects|^no <body> element|^html document over 2mb|^no internal outlinks|^inbound internal links come only|pagination url\(s\) declared by rel/;
+const _PAGE_CHECK_WARN_RE = /^multiple (title tags|canonical tags|meta descriptions|viewport tags|head elements|body elements)|^canonical (points to http|is a relative url|points to another host|only in the http header)|^noindex plus a canonical|^meta description outside head|^no compression|^paginated page|hreflang|^no lang attribute|^invalid lang attribute|^html lang|^h1 too long|may truncate in results|point to http|on-page anchor\(s\) point to nothing|^no doctype|^no charset declared|^charset is |^nosnippet|^canonical contains a fragment|^canonical points to a url that redirects|^no <body> element|^html document over 2mb|^no internal outlinks|^inbound internal links come only|pagination url\(s\) declared by rel|^(search|ai search|ai assistant|training) bot (sees different content|sees a thinner page|redirected elsewhere):|^content needs javascript|^mobile page has less content|^mobile and desktop pages differ/;
 
 function sevOf(issue) {
   const l = (issue || '').toLowerCase();
@@ -811,6 +815,9 @@ function _scResetPerCrawlState() {
   if (ndHeader) ndHeader.style.display = 'none';
   if (typeof _scRemoveReportPanels === 'function') _scRemoveReportPanels();
   if (typeof _scHideSavedCrawlNotice === 'function') _scHideSavedCrawlNotice();
+  if (typeof _scBotStatus === 'function') _scBotStatus('');
+  const botCount = document.querySelector('[data-count="__bots"]');
+  if (botCount) botCount.textContent = '-';
 }
 
 // Keyboard access for the clickable divs and spans (sidebar categories,
@@ -1382,6 +1389,7 @@ const _SC_REPORT_PANEL_IDS = [
   'all-images-panel', 'imgs-missing-alt-panel', 'external-links-panel', 'js-diff-panel',
   'all-values-panel', 'duplicates-panel', 'redir-chains-panel', 'traps-panel',
   'response-codes-panel', 'deep-pages-panel', 'hreflang-panel', 'severity-panel', 'summary-panel',
+  'bots-panel',
 ];
 function _scRemoveReportPanels() {
   _SC_REPORT_PANEL_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
@@ -1451,7 +1459,15 @@ window.selectCategory = function(cat) {
     'Conflicting robots directives': 'Conflicting Robots Directives (index and noindex)',
     'Robots "none"': 'Pages With robots "none" (noindex plus nofollow)',
     'nosnippet': 'Pages With nosnippet (no description in results)',
-    'noarchive': 'Pages With noarchive',
+    'noarchive': 'Pages With noarchive (kept out of Bing Copilot)',
+    'nocache': 'Pages With nocache (Bing Copilot: title and snippet only)',
+    'max-snippet limits the text Google can show, AI answers included': 'Pages With a Low max-snippet',
+    'data-nosnippet keeps sections out of snippets and AI answers': 'Pages With data-nosnippet Sections',
+    '__bots': 'Bot Readability: what each crawler gets from a sample of pages',
+    'Content needs JavaScript': 'Pages Whose Content Needs JavaScript',
+    'noindex in the HTML is removed by JavaScript': 'noindex Removed by JavaScript (Google may skip rendering)',
+    'Mobile page has less content than desktop': 'Mobile Pages With Less Content Than Desktop',
+    'Mobile and desktop pages differ': 'Mobile and Desktop Pages That Differ',
     'unavailable_after date has passed': 'Pages Whose unavailable_after Date Has Passed',
     'soft 404': 'Soft 404s (200 status on a page that says it is missing)',
     'Title may truncate in results': 'Titles Wide Enough to Truncate (pixel width, not characters)',
@@ -1532,7 +1548,7 @@ window.selectCategory = function(cat) {
   }
 
   const _isReportPanel = (typeof cat === 'string') &&
-    (cat.startsWith('__sm_') || cat === '__schema_by_page' || cat === '__nd_content' || cat === '__sitemap_viz' || cat === '__all_images' || cat === '__external_links' || cat === '__js_diff' || cat === '__all_titles' || cat === '__all_metas' || cat === '__all_h1s' || cat === '__all_canonicals' || cat === '__dup_titles' || cat === '__dup_metas' || cat === '__dup_h1s' || cat === '__dup_bodies' || cat === '__redir_chains' || cat === '__traps' || cat === '__response_codes' || cat === '__deep' || cat === '__hreflang' || cat === '__err' || cat === '__warn' || cat === '__info' || cat === '__summary');
+    (cat.startsWith('__sm_') || cat === '__schema_by_page' || cat === '__nd_content' || cat === '__sitemap_viz' || cat === '__all_images' || cat === '__external_links' || cat === '__js_diff' || cat === '__all_titles' || cat === '__all_metas' || cat === '__all_h1s' || cat === '__all_canonicals' || cat === '__dup_titles' || cat === '__dup_metas' || cat === '__dup_h1s' || cat === '__dup_bodies' || cat === '__redir_chains' || cat === '__traps' || cat === '__response_codes' || cat === '__deep' || cat === '__hreflang' || cat === '__err' || cat === '__warn' || cat === '__info' || cat === '__summary' || cat === '__bots');
   if (_isReportPanel) {
     renderIssueInfo(cat);
     const tbody = document.getElementById('crawler-tbody');
@@ -1574,6 +1590,8 @@ window.selectCategory = function(cat) {
       _scRenderSeverityPanel(cat);
     } else if (cat === '__summary') {
       _scRenderSummaryPanel();
+    } else if (cat === '__bots') {
+      _scRenderBotsPanel();
     } else {
       _renderSitemapPanel(cat);
     }
@@ -3679,6 +3697,10 @@ function updateCounts() {
   if ('__traps'          in counts) counts.__traps          = ((_reps.url_traps || {}).soft_404 ? 1 : 0) + ((_reps.url_traps || {}).nested_trap ? 1 : 0);
   if ('__response_codes' in counts) counts.__response_codes = (_pages.filter(r => r.status_code)).length;
   if ('__deep'           in counts) counts.__deep           = _pages.filter(r => (r.depth || 0) >= 4).length;
+  if ('__bots' in counts) {
+    const bc = _reps.bot_check;
+    counts.__bots = bc ? Object.keys(bc.page_issues || {}).length : '-';
+  }
   if ('__hreflang' in counts) {
     counts.__hreflang = _pages.filter(r => Array.isArray(r.hreflang) && r.hreflang.length).length;
     // Hide the Hreflang sidebar entry on sites that don't use it at all —
@@ -4138,6 +4160,26 @@ function _buildExportForCategory(cat) {
     return { header: ['Page URL', 'Hreflang', 'Alternate URL'], rows };
   }
 
+  // Bot readability: one row per (page, crawler).
+  if (cat === '__bots') {
+    const rep = (window.crawlerReports || {}).bot_check;
+    if (!rep) return { header: [], rows: [] };
+    const rows = [];
+    for (const u of (rep.sample || [])) {
+      const pg = (rep.pages || {})[u] || {};
+      for (const a of (rep.agents || [])) {
+        if (a.id === 'browser') continue;
+        const c = (pg.cells || {})[a.id] || {};
+        const robots = (pg.robots || {})[a.id];
+        rows.push([u, a.label, _SC_BOT_KIND[a.kind] || a.kind,
+          a.renders_js === true ? 'yes' : a.renders_js === false ? 'no' : 'not documented',
+          robots === false ? 'disallowed' : robots === true ? 'allowed' : '',
+          a.live ? (c.state || '') : 'robots.txt only', c.detail || '', c.status || '']);
+      }
+    }
+    return { header: ['Page URL', 'Crawler', 'Kind', 'Runs JavaScript', 'robots.txt', 'Result', 'Detail', 'Status'], rows };
+  }
+
   // Default: page-level summary using matchesCategory.
   const filtered = (cat === 'all')
     ? crawlerResults.slice()
@@ -4170,6 +4212,7 @@ function _crawlerExportViewLabel(cat, n) {
     '__sm_redirects':  `Export view (${n} redirect${n===1?'':'s'} in sitemap)`,
     '__sm_pagination': `Export view (${n} pagination URL${n===1?'':'s'} in sitemap)`,
     '__nd_content':    `Export view (${n} near-dup pair${n===1?'':'s'})`,
+    '__bots':          `Export view (${n} crawler result${n===1?'':'s'})`,
     '__dup_titles':    `Export view (${n} duplicate-title URL${n===1?'':'s'})`,
     '__dup_metas':     `Export view (${n} duplicate-meta URL${n===1?'':'s'})`,
     '__dup_h1s':       `Export view (${n} duplicate-H1 URL${n===1?'':'s'})`,
@@ -4261,6 +4304,7 @@ async function exportCrawlerXlsx() {
       ['__sm_non200',     'Non-200 In Sitemap'],
       ['__sm_redirects',  'Redirects In Sitemap'],
       ['__sm_noindex',    'Noindex In Sitemap'],
+      ['__bots',          'Bot Readability'],
     ];
     for (const [cat, name] of cats) {
       try {
@@ -4526,6 +4570,24 @@ function _scBuildAiBrief(opts) {
     add('');
   }
 
+  const bots = reports.bot_check;
+  if (bots && (bots.sample || []).length) {
+    const label = (id) => ((bots.agents || []).find(a => a.id === id) || {}).label || id;
+    add(`## Bot readability (${bots.sample.length} sample pages)`, '',
+      '- Requests sent from the crawling machine with each crawler\'s user agent; CDNs can treat the real crawlers differently.');
+    for (const [id, v] of Object.entries(bots.verdicts || {})) {
+      if (id === 'googlebot-desktop') continue;
+      const c = v.counts || {};
+      const off = Object.entries(c).filter(([s]) => s !== 'same').map(([s, k]) => `${s} on ${k}`);
+      add(`- ${label(id)}: ${off.length ? off.join(', ') + `; same on ${c.same || 0}` : `same as a browser on all ${v.checked} pages`}`);
+    }
+    for (const [u, list] of Object.entries(bots.page_issues || {})) {
+      add(`- ${u}: ${list.map(i => _scMdCell(i, 160)).join('; ')}`);
+    }
+    (bots.notes || []).forEach(t => add(`- Note: ${_scMdCell(t, 200)}`));
+    add('');
+  }
+
   const pairs = window._ndPairs || [];
   if (pairs.length) {
     add(`## Near-duplicate pages (${pairs.length} pair${pairs.length === 1 ? '' : 's'})`, '');
@@ -4659,6 +4721,217 @@ function downloadAiBrief() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// =============================================================================
+// Bot readability: a sample of pages requested as a browser and as each
+// crawler that publishes its user agent, compared by the server (/bot-check).
+// Findings are merged into the pages' issues so they reach the Summary, the
+// exports and the AI brief; the full report lives in crawlerReports.bot_check
+// and is saved with the crawl.
+// =============================================================================
+const _SC_BOT_STATE = {
+  same:       { sym: '✓', cls: 'ok',   text: 'Same page as a browser' },
+  thinner:    { sym: '≈', cls: 'warn', text: 'Thinner page' },
+  different:  { sym: '≠', cls: 'warn', text: 'Different content' },
+  redirected: { sym: '↪', cls: 'warn', text: 'Redirected elsewhere' },
+  noindex:    { sym: 'N', cls: 'err',  text: 'noindex for this crawler' },
+  blocked:    { sym: '✕', cls: 'err',  text: 'Blocked' },
+  challenged: { sym: '⚠', cls: 'err',  text: 'CDN challenge' },
+  error:      { sym: '?', cls: 'muted', text: 'No response' },
+};
+const _SC_BOT_KIND = { search: 'Search', 'ai-search': 'AI search', 'ai-assistant': 'AI assistant', training: 'Training', baseline: 'Baseline' };
+let _scBotRunning = false;
+
+function _scBotStatus(text) {
+  const el = document.getElementById('bots-status');
+  if (!el) return;
+  el.style.display = text ? '' : 'none';
+  el.textContent = text || '';
+}
+
+// Swap in this report's findings, removing the previous run's first.
+function _scMergeBotIssues(report) {
+  const add = (report && report.page_issues) || {};
+  for (const r of (crawlerResults || [])) {
+    if (Array.isArray(r._bot_issues) && r._bot_issues.length) {
+      r.issues = (r.issues || []).filter(i => !r._bot_issues.includes(i));
+    }
+    r._bot_issues = [];
+    const mine = add[r.url];
+    if (mine && mine.length) {
+      r.issues = r.issues || [];
+      for (const i of mine) if (!r.issues.includes(i)) r.issues.push(i);
+      r._bot_issues = mine.slice();
+    }
+  }
+}
+
+async function runBotCheck() {
+  if (_scBotRunning) return;
+  if (!Array.isArray(crawlerResults) || !crawlerResults.length) return;
+  _scBotRunning = true;
+  const sizeEl = document.getElementById('crawler-bots-sample');
+  const sample = Math.max(1, Math.min(parseInt((sizeEl && sizeEl.value) || '10', 10) || 10, 100));
+  const speed = document.getElementById('crawler-speed');
+  const delay = speed ? parseFloat(speed.value) || 0.4 : 0.4;
+  // The server picks the sample; it only needs these fields.
+  const rows = crawlerResults.map(r => ({ url: r.url, status_code: r.status_code, depth: r.depth,
+    content_type: r.content_type, indexable: r.indexable, redirect_url: r.redirect_url,
+    canonical_kind: r.canonical_kind, body_hash: r.body_hash }));
+  _scBotStatus('Starting the bot check…');
+  if (activeCategory === '__bots') _scRenderBotsPanel();
+  let report = null;
+  try {
+    const resp = await fetch('/bot-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: rows, sample, delay }),
+    });
+    if (!resp.ok || !resp.body) {
+      let msg = 'HTTP ' + resp.status;
+      try { const d = await resp.json(); if (d.error) msg = d.error; } catch {}
+      throw new Error(msg);
+    }
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === 'progress') _scBotStatus(`Checking bots: ${ev.done} of ${ev.total} requests`);
+        else if (ev.type === 'result') report = ev.report;
+        else if (ev.type === 'error') throw new Error(ev.error || 'bot check failed');
+      }
+    }
+    if (!report) throw new Error('no report came back');
+    window.crawlerReports = window.crawlerReports || {};
+    window.crawlerReports.bot_check = report;
+    _scMergeBotIssues(report);
+    _scBotStatus('');
+    if (typeof updateCounts === 'function') updateCounts();
+    const flagged = Object.keys(report.page_issues || {}).length;
+    showToast(flagged
+      ? `Bot check: ${flagged} of ${report.sample.length} sample pages need a look`
+      : `Bot check: all ${report.sample.length} sample pages read the same for every crawler`, flagged ? 'warn' : 'success');
+  } catch (e) {
+    _scBotStatus('');
+    showToast(`Bot check failed: ${e.message || e}`, 'error');
+  } finally {
+    _scBotRunning = false;
+    if (activeCategory === '__bots') _scRenderBotsPanel();
+  }
+}
+
+function _scBotVerdictText(agent, v, n) {
+  if (!v || !v.checked) return 'Not checked';
+  const c = v.counts || {};
+  const same = c.same || 0;
+  if (same === v.checked) return `Same page as a browser on all ${n} pages`;
+  const parts = Object.entries(c).filter(([s]) => s !== 'same')
+    .map(([s, k]) => `${(_SC_BOT_STATE[s] || {}).text || s} on ${k}`);
+  return parts.join(', ') + (same ? `; same on ${same}` : '');
+}
+
+function _scRenderBotsPanel() {
+  const main = document.querySelector('.results-panel') || document.getElementById('crawler-results');
+  if (!main) return;
+  const old = document.getElementById('bots-panel');
+  if (old) old.remove();
+  const panel = document.createElement('div');
+  panel.id = 'bots-panel';
+  panel.className = 'bots-panel';
+  const report = (window.crawlerReports || {}).bot_check;
+  const runBtn = `<button type="button" class="ai-btn" onclick="runBotCheck()" ${_scBotRunning ? 'disabled' : ''}>${_scBotRunning ? 'Checking…' : (report ? 'Run again' : 'Run bot check')}</button>`;
+  const caveat = `<p class="bots-caveat">Requests are sent from this machine with each crawler's user agent. CDNs and firewalls recognise the real crawlers by IP address or signature, so a block, a challenge or a clean pass here can differ from what the real crawler gets, in either direction. Treat a problem as a lead to check in your CDN or firewall settings. For Google, confirm with the URL Inspection live test in Search Console. Use on sites you own or audit.</p>`;
+  if (!report) {
+    panel.innerHTML = `<div class="bots-head"><div><h3>Bot readability</h3>
+      <p>No bot check for this crawl yet. It requests about 10 sample pages as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents, then compares what comes back, with and without JavaScript.</p></div>${runBtn}</div>${caveat}`;
+    main.appendChild(panel);
+    return;
+  }
+  const agents = report.agents || [];
+  const live = agents.filter(a => a.live && a.id !== 'browser');
+  const robotsOnly = agents.filter(a => !a.live);
+  const n = (report.sample || []).length;
+  const when = new Date((report.checked_at || 0) * 1000).toLocaleString();
+  const jsWord = (a) => a.renders_js === true ? 'runs JavaScript' : a.renders_js === false ? 'no JavaScript' : 'JavaScript not documented';
+
+  const cards = live.filter(a => a.id !== 'googlebot-desktop').map(a => {
+    const v = (report.verdicts || {})[a.id] || {};
+    const st = _SC_BOT_STATE[v.state] || _SC_BOT_STATE.error;
+    return `<div class="bot-card ${st.cls}">
+      <div class="bot-card-top"><span class="bot-sym">${st.sym}</span><b>${escapeHtml(a.label)}</b></div>
+      <div class="bot-card-meta">${escapeHtml(_SC_BOT_KIND[a.kind] || a.kind)} · ${jsWord(a)}</div>
+      <div class="bot-card-text">${escapeHtml(_scBotVerdictText(a, v, n))}</div>
+    </div>`;
+  }).join('');
+  const robotsLine = robotsOnly.map(a => {
+    const allowed = (report.sample || []).filter(u => (((report.pages || {})[u] || {}).robots || {})[a.id] !== false).length;
+    return `<span class="bot-robots-chip ${allowed === n ? 'ok' : 'err'}" title="No published user agent, so only robots.txt was read">${escapeHtml(a.label)}: robots.txt ${allowed === n ? 'allows' : `blocks ${n - allowed} of ${n}`}</span>`;
+  }).join(' ');
+
+  const head = `<tr><th>Page</th><th title="Words in the page as served, and after JavaScript ran">Words: no JS / JS</th><th title="Googlebot smartphone against Googlebot desktop">Words: mobile / desktop</th>`
+    + live.filter(a => a.id !== 'googlebot-desktop').map(a => `<th title="${escapeHtml(a.label)}: ${escapeHtml(_SC_BOT_KIND[a.kind] || a.kind)}">${escapeHtml(a.label.replace(' smartphone', ''))}</th>`).join('')
+    + `</tr>`;
+  const body = (report.sample || []).map(u => {
+    const pg = (report.pages || {})[u] || {};
+    const path = u.replace(/^https?:\/\/[^\/]+/, '') || '/';
+    if (pg.baseline && pg.baseline.error) {
+      return `<tr><td class="bots-url"><a href="${safeHref(u)}" target="_blank" rel="noopener">${escapeHtml(path)}</a></td><td colspan="99" class="muted">The browser request failed: ${escapeHtml(pg.baseline.error)}</td></tr>`;
+    }
+    const b = pg.baseline || {};
+    const js = pg.js;
+    const fmt = (x) => Number(x || 0).toLocaleString();
+    let jsCell = `${fmt(b.words)} words`;
+    let jsCls = '';
+    if (js) {
+      const low = js.rendered_words >= 50 && js.raw_words < 0.5 * js.rendered_words;
+      jsCell = `${fmt(js.raw_words)} / ${fmt(js.rendered_words)}`;
+      jsCls = low || js.noindex_removed ? 'warn' : '';
+      jsCell += js.noindex_removed ? ' · noindex removed by JS' : '';
+    }
+    const m = pg.mobile;
+    let mCell = '-', mCls = '';
+    if (m) {
+      const bad = (m.fields || []).length || (m.desktop_words >= 50 && m.mobile_words < 0.7 * m.desktop_words);
+      mCell = (m.fields || []).length ? `differs: ${(m.fields || []).join(', ')}` : `${fmt(m.mobile_words)} / ${fmt(m.desktop_words)}`;
+      mCls = bad ? 'warn' : 'ok';
+    }
+    const cells = live.filter(a => a.id !== 'googlebot-desktop').map(a => {
+      const c = (pg.cells || {})[a.id] || {};
+      const st = _SC_BOT_STATE[c.state] || _SC_BOT_STATE.error;
+      const robotsOk = (pg.robots || {})[a.id];
+      const tip = `${a.label}: ${st.text}${c.detail ? ' (' + c.detail + ')' : ''}${robotsOk === false ? '. robots.txt disallows this crawler here' : ''}`;
+      return `<td class="bot-cell ${st.cls}${robotsOk === false ? ' disallowed' : ''}" title="${escapeHtml(tip)}">${st.sym}${robotsOk === false ? '<span class="bot-dis">robots</span>' : ''}</td>`;
+    }).join('');
+    return `<tr><td class="bots-url" title="${escapeHtml(u)}"><a href="${safeHref(u)}" target="_blank" rel="noopener">${escapeHtml(path)}</a></td>`
+      + `<td class="${jsCls}" title="${js ? 'words without JavaScript / with JavaScript' : 'words in the HTML'}">${escapeHtml(jsCell)}</td>`
+      + `<td class="${mCls}" title="mobile words / desktop words">${escapeHtml(mCell)}</td>${cells}</tr>`;
+  }).join('');
+
+  const notes = [...(report.notes || []), ...(report.robots_note ? [report.robots_note] : [])]
+    .map(t => `<p class="bots-note">${escapeHtml(t)}</p>`).join('');
+  const legend = Object.values(_SC_BOT_STATE).map(s => `<span class="bot-legend ${s.cls}">${s.sym} ${escapeHtml(s.text)}</span>`).join(' ');
+  panel.innerHTML = `
+    <div class="bots-head">
+      <p>${n} sample page${n === 1 ? '' : 's'}, checked ${escapeHtml(when)}${report.rendered ? ', each rendered with and without JavaScript' : ''}.</p>
+      ${runBtn}
+    </div>
+    ${caveat}
+    ${notes}
+    <div class="bot-cards">${cards}</div>
+    <div class="bot-robots">${robotsLine}</div>
+    <div class="bots-table-wrap"><table class="bots-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="bot-legends">${legend}<span class="bot-legend"><span class="bot-dis">robots</span> robots.txt disallows the crawler</span></div>`;
+  main.appendChild(panel);
+}
+
 function crawlFinished() {
   if (crawlerTimer) { clearInterval(crawlerTimer); crawlerTimer = null; }
   document.getElementById('crawler-start-btn').style.display = '';
@@ -4694,6 +4967,11 @@ function crawlFinished() {
       setTimeout(() => {
         try { window.runNearDupAnalysis(); } catch (e) { console.warn('auto-runNearDup failed:', e); }
       }, 1800);
+    }
+    // Bot readability check, on by default.
+    const _botCheckbox = document.getElementById('crawler-run-bots');
+    if (_botCheckbox && _botCheckbox.checked) {
+      setTimeout(() => { runBotCheck(); }, 2500);
     }
   }
 }

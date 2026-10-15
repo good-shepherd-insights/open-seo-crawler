@@ -38,6 +38,7 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
 
 ## What's new (recent additions)
 
+- **Bot readability check**: after every crawl, a sample of pages is requested as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents (OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot, CCBot). Blocks, CDN challenges, redirects, a different title or text, a thinner page or a noindex aimed at one crawler are flagged, as is content that only exists after JavaScript runs and a mobile page with less content than desktop. On by default for 10 pages.
 - **AI brief**: one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
 - **Every report exports**: Export view now works on every report tab (All Titles, Redirect Chains, Hreflang, Deep Pages and the rest), and the .xlsx workbook adds a sheet for each report that has rows.
 - **Safer and steadier**: crawled titles, URLs and robots.txt lines can no longer run script inside the app, other websites can no longer trigger Update or Restart, the Update button restarts cleanly under systemd and launchd, and sitemap analysis works again.
@@ -75,6 +76,19 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
   - Bare emails written without `mailto:` (`<a href="sales@example.com">`) dropped instead of becoming fake `/contact/sales@example.com` URLs
   - Plain text pasted into `href` (addresses, Google Maps Plus Codes) reported as a **Malformed link href** issue instead of spawning a phantom 404 under every page
   - Post-crawl soft-404 probes detect servers that return 200 for URLs that cannot exist
+
+### Bot readability (search and AI crawlers)
+
+Googlebot, Bingbot and Applebot render JavaScript; most AI crawlers do not say they do, so they read the HTML as served. After each crawl (tick box, on by default) a sample of pages, the home page plus one page from each section, is requested as a browser and as each crawler below, then compared.
+
+- **Live requests** with the user agent each operator publishes: Googlebot (smartphone and desktop), Bingbot, Applebot, OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot and CCBot.
+- **robots.txt only** for crawlers with no published user agent (ClaudeBot, Claude-SearchBot, Claude-User) and for tokens that are not crawlers (Google-Extended, Applebot-Extended).
+- **Per page and crawler**: blocked (403, 429, 503), CDN challenge, redirected elsewhere, noindex for that crawler only, different title, H1, canonical or text, or a thinner page. Each page is fetched twice as a browser first, so pages that change on every load are not called different.
+- **JavaScript**: each sample page is rendered once to count the words that only exist after JavaScript runs, and to catch a noindex in the HTML that a script removes (Google may skip rendering such a page).
+- **Mobile first**: Googlebot smartphone against Googlebot desktop.
+- **On every crawled page**: robots directives with the meaning their owners document for AI answers (nosnippet, noarchive and nocache for Bing Copilot, max-snippet, data-nosnippet) and noindex aimed at Googlebot or Bingbot only.
+
+The requests come from your machine with each crawler's user agent. CDNs and firewalls recognise the real crawlers by IP address or signature, so a result can differ from what the real crawler gets, in either direction: treat a problem as a lead to check in your CDN or firewall settings, and confirm Googlebot with the URL Inspection live test in Search Console. Use it on sites you own or audit.
 
 ### What gets checked per page
 
@@ -336,6 +350,7 @@ The **Summary** tab auto-opens during the crawl and live-refreshes as pages come
 | Ignore noindex | off | Default: noindex pages excluded from duplicate / orphan reports |
 | Sitemap analysis | **on** | Post-crawl: flags missing from sitemap, orphans, sitemap-only, non-200, redirects in sitemap |
 | Near-duplicate content | **on** at 90% | Shingle Jaccard on body content; flag pairs ≥ 90% similar (tweak to 80 / 85 / 90 or custom) |
+| Bot readability check | **on**, 10 pages | Post-crawl: sample pages requested as a browser and as each crawler, compared with and without JavaScript; about 11 requests per page at the per-host delay |
 | Include / exclude patterns | empty | Glob wildcards, e.g. `*?variant=*`, `*/cart/*` |
 
 Optional environment variables (for shared / multi-tool setups):

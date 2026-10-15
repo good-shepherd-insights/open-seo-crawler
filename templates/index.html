@@ -273,6 +273,8 @@
           <small style="display:block;margin-top:3px;">Stops shared CTAs / testimonials / footers from inflating similarity. Canonicalised URLs are skipped automatically.</small>
         </details>
       </div>
+      <label class="check" title="After the crawl, requests a sample of pages as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents, and compares what comes back, with and without JavaScript. Sent from this machine with each crawler's user agent, so a result is a lead, not proof. Use on sites you own or audit."><input type="checkbox" id="crawler-run-bots" checked /> Bot readability check <small>(after crawl: sample pages as Googlebot, Bingbot and AI crawlers)</small></label>
+      <div class="bots-cfg"><small>Sample</small> <input type="number" id="crawler-bots-sample" min="1" max="100" value="10" aria-label="Pages in the bot readability sample"> <small>pages, about 11 requests each</small></div>
 
       <details class="filters">
         <summary>URL filters (robots.txt + custom rules)</summary>
@@ -403,6 +405,10 @@
 
       <div class="ci-section-header" id="nd-section-header" style="display:none;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 8px 4px;font-weight:700;">Content duplication</div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__nd_content" onclick="selectCategory('__nd_content')" id="nd-cat-content" style="display:none;"><span title="Pairs of pages whose body content exceeds the similarity threshold">Near-duplicate content</span><span class="ci-count warn" data-count="__nd_content">0</span></div>
+
+      <div class="cat-label">Bot readability</div>
+      <div id="bots-status" class="sitemap-status" style="display:none;"></div>
+      <div role="button" tabindex="0" class="ci-cat" data-cat="__bots" onclick="selectCategory('__bots')" id="bots-cat"><span title="Whether a browser, the search crawlers and the AI crawlers get the same readable page, with and without JavaScript">Bot Readability</span><span class="ci-count" data-count="__bots">-</span></div>
 
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 8px 4px;font-weight:700;">Visualisations</div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sitemap_viz" onclick="selectCategory('__sitemap_viz')"><span title="Sunburst, hierarchy and anchor-text cloud views of the site">Site Structure</span><span class="ci-count" data-count="__sitemap_viz">-</span></div>

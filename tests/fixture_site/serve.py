@@ -26,8 +26,51 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=SITE, **kw)
 
+    def _send_html(self, html, status=200):
+        data = html.encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'text/html')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(data)
+
+    def _page_html(self, path):
+        with open(os.path.join(SITE, path.strip('/'), 'index.html'), encoding='utf-8') as fh:
+            return fh.read()
+
+    def _bot_fault(self, path):
+        """Answer some crawler user agents differently, one fault per page.
+        Returns True when it sent the response."""
+        ua = self.headers.get('User-Agent', '')
+        p = path.rstrip('/') + '/'
+        if p == '/bot-blocked/' and 'GPTBot' in ua:
+            self.send_error(403, 'Forbidden')
+            return True
+        if p == '/bot-redirect/' and 'bingbot' in ua:
+            self.send_response(302)
+            self.send_header('Location', '/about/')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return True
+        if p == '/bot-cloaked/' and 'Googlebot' in ua:
+            html = self._page_html(p).replace('<title>The same title for everyone</title>',
+                                              '<title>A different title for search engines</title>')
+            self._send_html(html)
+            return True
+        if (p == '/bot-thin/' and 'PerplexityBot' in ua) or (p == '/bot-mobile-thin/' and 'Mobile' in ua):
+            html = self._page_html(p)
+            start = html.index('<p>') + 3
+            # Keep the opening of the copy only: a cut-down page.
+            html = html[:start] + 'Plain sentences about widgets and how they are made. ' * 3 + html[html.index('</p>', start):]
+            self._send_html(html)
+            return True
+        return False
+
     def do_GET(self):
         path = self.path.split('?')[0]
+        if self._bot_fault(path):
+            return
         if path in REDIRECTS:
             status, location = REDIRECTS[path]
             self.send_response(status)

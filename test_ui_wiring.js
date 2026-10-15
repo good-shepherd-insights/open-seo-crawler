@@ -38,7 +38,29 @@ const CASES = [
   ["4 image(s) with no width or height (causes layout shift)", "info", "image dimensions"],
   ["URL: uppercase", "warn", "URL:"],
   ["URL: internal search result page", "warn", "URL:"],
+  // Directives, reported with the meaning their owners document.
+  ["noarchive (Bing keeps the page out of Copilot answers; Amazon will not train on it)", "info", "noarchive"],
+  ["nocache (Bing Copilot shows only the URL, title and snippet)", "info", "nocache"],
+  ["max-snippet limits the text Google can show, AI answers included (20 characters)", "info",
+   "max-snippet limits the text Google can show, AI answers included"],
+  ["data-nosnippet keeps sections out of snippets and AI answers (2 section(s))", "info",
+   "data-nosnippet keeps sections out of snippets and AI answers"],
+  ["noindex only for Googlebot (meta name=\"googlebot\")", "error", "noindex only for Googlebot"],
+  // Bot readability. One card per crawler, so the heading is the card label.
+  ["Search bot blocked: Googlebot smartphone (HTTP 403)", "error", "Search bot blocked: Googlebot smartphone"],
+  ["AI search bot challenged: PerplexityBot (Cloudflare challenge (HTTP 403))", "error", "AI search bot challenged: PerplexityBot"],
+  ["Training bot blocked: GPTBot (HTTP 403)", "info", "Training bot blocked: GPTBot"],
+  ["Search bot sees different content: Bingbot (title, text)", "warn", "Search bot sees different content: Bingbot"],
+  ["AI search bot sees a thinner page: PerplexityBot (35 of 278 words)", "warn", "AI search bot sees a thinner page: PerplexityBot"],
+  ["AI assistant bot redirected elsewhere: ChatGPT-User (to https://example.com/)", "warn", "AI assistant bot redirected elsewhere: ChatGPT-User"],
+  ["Content needs JavaScript (crawlers that do not run it see 4 of 324 words)", "warn", "Content needs JavaScript"],
+  ["noindex in the HTML is removed by JavaScript (Google may skip rendering a noindex page, so it can stay out of the index)", "error",
+   "noindex in the HTML is removed by JavaScript"],
+  ["Mobile page has less content than desktop (33 of 276 words)", "warn", "Mobile page has less content than desktop"],
 ];
+// Cards whose label carries a crawler name or a count: the drill-in heading
+// falls back to that label, so they need no titleMap entry.
+const LABEL_IS_HEADING = (slug) => / bot (blocked|challenged|sees|redirected)|^noindex only for |^content needs javascript|^noindex in the html|^mobile /i.test(slug);
 
 function grab(header, endNeedle) {
   const start = SRC.indexOf(header);
@@ -86,7 +108,7 @@ check("a counted issue is one card whatever the count", a === b);
 
 // Every slug needs a drill-in heading.
 for (const [, , slug] of CASES) {
-  check(`titleMap has a heading for "${slug}"`, SRC.includes(`'${slug}':`) || slug === "URL:");
+  check(`titleMap has a heading for "${slug}"`, SRC.includes(`'${slug}':`) || slug === "URL:" || LABEL_IS_HEADING(slug));
 }
 
 if (failures.length) {

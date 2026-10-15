@@ -212,26 +212,12 @@ def _build_robots_checker(robots_text):
     """
     if not robots_text:
         return lambda u: True
-    star = _parse_robots_groups(robots_text).get('*') or {}
-    disallows = [v for v in star.get('disallow', []) if v]
-    allows = [v for v in star.get('allow', []) if v]
+    allows, disallows = _robots_rules_for(_parse_robots_groups(robots_text), '*')
     if not disallows and not allows:
         return lambda u: True
-
-    def can_fetch(url):
-        best_allow = -1
-        best_disallow = -1
-        for a in allows:
-            if len(a) > best_allow and _robots_pattern_match(a, url):
-                best_allow = len(a)
-        for d in disallows:
-            if len(d) > best_disallow and _robots_pattern_match(d, url):
-                best_disallow = len(d)
-        # Tie or longer Allow wins; only block when Disallow is strictly
-        # more specific. This matches Google's robots.txt parser.
-        return best_disallow <= best_allow
-
-    return can_fetch
+    # Tie or longer Allow wins; only block when Disallow is strictly more
+    # specific. This matches Google's robots.txt parser.
+    return lambda url: _robots_allows(allows, disallows, url)
 
 
 # Well-known AI crawler user-agents (2026), split by what blocking them costs.
@@ -1448,6 +1434,8 @@ def _parse_no_js_subset(html, base_url):
         out['title'] = t.get_text(strip=True) if t else ''
         m = soup.find('meta', attrs={'name': 'description'})
         out['meta_description'] = m.get('content', '') if m else ''
+        rb = soup.find('meta', attrs={'name': _re.compile(r'^robots$', _re.I)})
+        out['noindex'] = bool(rb and 'noindex' in (rb.get('content') or '').lower())
         import re as _re_h
         def _clean_h(tag):
             txt = ' '.join(tag.get_text(' ', strip=True).split())
@@ -2211,7 +2199,10 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         }
         result['security'] = sec
         result['x_robots_tag'] = hdrs.get('x-robots-tag', '')
-        if result['x_robots_tag'] and 'noindex' in result['x_robots_tag'].lower():
+        # Indexable means indexable for Google: unscoped directives plus a
+        # "googlebot:" section. A "bingbot: noindex" header no longer marks
+        # the page as out of the index for everyone.
+        if 'noindex' in page_checks.x_robots_for(result['x_robots_tag'], 'googlebot'):
             result['indexable'] = False
 
         # Judge on the effective status: a solved challenge carries the real
@@ -2911,6 +2902,11 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
                 elif sev == 'high':
                     fields = ', '.join(result['js_diff'].get('fields', [])) or 'h1/word_count'
                     result['issues'].append(f'JS-only content (high: {fields})')
+                # Google may skip rendering a page whose HTML says noindex, so
+                # a script that removes the tag may never run for Googlebot.
+                if nojs.get('noindex') and result.get('indexable', True):
+                    result['issues'].append('noindex in the HTML is removed by JavaScript (Google may skip '
+                                            'rendering a noindex page, so it can stay out of the index)')
             except Exception as e:
                 result.setdefault('render_errors', []).append(f'no-js diff: {str(e)[:160]}')
 
@@ -3652,6 +3648,483 @@ def _probe_url_traps(base, results, session):
         except Exception as e:
             out['probes'].append({'kind': kind, 'url': purl, 'error': str(e)[:120]})
     return out
+
+
+# =============================================================================
+# Bot readability check
+# =============================================================================
+# Re-requests a sample of pages as a browser and as each crawler that
+# publishes its user-agent string, then compares what comes back: status,
+# blocks and challenges, redirects, title, H1, canonical, robots directives
+# and the main text. The pages are also rendered once, to measure how much of
+# each page only exists after JavaScript runs, and Googlebot's smartphone and
+# desktop responses are compared for mobile-first indexing.
+#
+# The agent list comes from the operators' own pages, checked 2026-10-15
+# (user agents, who renders JavaScript, how they verify their crawlers).
+#
+# These requests come from this machine with a bot's user agent. CDNs verify
+# real crawlers by IP address or signature, so a block, a challenge or a
+# clean pass here can differ from what the real crawler gets, in either
+# direction. Results are worded "request sending X's user agent", never
+# "what X sees".
+
+_BOT_CHROME = '132.0.0.0'
+# id, label, kind, renders JavaScript (True, False, or None when the operator
+# does not say), user agent, robots.txt token
+_BOT_AGENTS = [
+    ('browser', 'Browser', 'baseline', True,
+     f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{_BOT_CHROME} Safari/537.36',
+     None),
+    ('googlebot', 'Googlebot smartphone', 'search', True,
+     f'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) '
+     f'Chrome/{_BOT_CHROME} Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+     'Googlebot'),
+    ('googlebot-desktop', 'Googlebot desktop', 'search', True,
+     f'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) '
+     f'Chrome/{_BOT_CHROME} Safari/537.36',
+     'Googlebot'),
+    ('bingbot', 'Bingbot', 'search', True,
+     f'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) '
+     f'Chrome/{_BOT_CHROME} Safari/537.36',
+     'Bingbot'),
+    ('applebot', 'Applebot', 'search', True,
+     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+     'Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)',
+     'Applebot'),
+    ('oai-searchbot', 'OAI-SearchBot', 'ai-search', None,
+     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
+     'Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot',
+     'OAI-SearchBot'),
+    ('perplexitybot', 'PerplexityBot', 'ai-search', None,
+     'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)',
+     'PerplexityBot'),
+    ('chatgpt-user', 'ChatGPT-User', 'ai-assistant', None,
+     'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+     'ChatGPT-User'),
+    ('gptbot', 'GPTBot', 'training', None,
+     'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot',
+     'GPTBot'),
+    ('ccbot', 'CCBot', 'training', False, 'CCBot/2.0 (https://commoncrawl.org/faq/)', 'CCBot'),
+]
+# robots.txt tokens with no published user agent, or that are not crawlers
+# at all (Google-Extended and Applebot-Extended only control how data the
+# main crawler collected may be used): only their robots.txt rules are read.
+_BOT_ROBOTS_ONLY = [
+    ('claudebot', 'ClaudeBot', 'training', 'ClaudeBot'),
+    ('claude-searchbot', 'Claude-SearchBot', 'ai-search', 'Claude-SearchBot'),
+    ('claude-user', 'Claude-User', 'ai-assistant', 'Claude-User'),
+    ('google-extended', 'Google-Extended', 'training', 'Google-Extended'),
+    ('applebot-extended', 'Applebot-Extended', 'training', 'Applebot-Extended'),
+]
+_BOT_KIND_WORD = {'search': 'Search', 'ai-search': 'AI search',
+                  'ai-assistant': 'AI assistant', 'training': 'Training'}
+# Statuses that mean the request was turned away rather than answered.
+_BOT_BLOCK_STATUSES = (401, 403, 429, 503)
+
+
+def _robots_rules_for(groups, token):
+    """Allow and disallow rules for one crawler: the group that names it,
+    else the * group. Applebot follows Googlebot's group when robots.txt does
+    not name Applebot (Apple's documentation)."""
+    t = (token or '*').lower()
+    group = groups.get(t)
+    if group is None and t == 'applebot':
+        group = groups.get('googlebot')
+    if group is None:
+        group = groups.get('*') or {}
+    return ([v for v in group.get('allow', []) if v],
+            [v for v in group.get('disallow', []) if v])
+
+
+def _robots_allows(allows, disallows, url):
+    """Google's precedence: the longest matching rule wins, and a tie goes to
+    Allow."""
+    best_allow = max((len(a) for a in allows if _robots_pattern_match(a, url)), default=-1)
+    best_disallow = max((len(d) for d in disallows if _robots_pattern_match(d, url)), default=-1)
+    return best_disallow <= best_allow
+
+
+def _bot_section(url):
+    try:
+        segs = [s for s in urlparse(url).path.split('/') if s]
+    except ValueError:
+        return ''
+    return segs[0].lower() if segs else ''
+
+
+def _bot_sample(results, n=10):
+    """Pages for the check: the start page, then one page from each top-level
+    section (shallowest first), then the shallowest pages left."""
+    pages = []
+    for r in results or []:
+        u = r.get('url') or ''
+        ctype = (r.get('content_type') or 'text/html').lower()
+        if (not _HAS_SCHEME_RE.match(u) or (r.get('status_code') or 0) != 200 or r.get('redirect_url')
+                or r.get('indexable') is False or 'html' not in ctype
+                or r.get('canonical_kind') == 'canonicalised'):
+            continue
+        pages.append(r)
+    pages.sort(key=lambda r: ((r.get('depth') or 0), len(r.get('url') or '')))
+    # The same page under two URLs (/ and /index.html) would only spend a
+    # slot twice: skip a body the sample already has.
+    chosen, sections, bodies = [], set(), set()
+
+    def take(r):
+        h = r.get('body_hash')
+        if h and h in bodies:
+            return False
+        chosen.append(r['url'])
+        if h:
+            bodies.add(h)
+        return True
+
+    for r in pages:
+        if len(chosen) >= n:
+            break
+        sec = _bot_section(r['url'])
+        if (not chosen or sec not in sections) and take(r):
+            sections.add(sec)
+    for r in pages:
+        if len(chosen) >= n:
+            break
+        if r['url'] not in chosen:
+            take(r)
+    return chosen
+
+
+def _bot_directives(soup, headers, token):
+    """robots directives that apply to one crawler: the generic robots meta
+    and X-Robots-Tag, plus any meta or header line naming that crawler."""
+    parts = []
+    names = {'robots'}
+    if token:
+        names.add(token.lower())
+    for m in soup.find_all('meta'):
+        if (m.get('name') or '').strip().lower() in names:
+            parts.append((m.get('content') or '').lower())
+    parts.extend(page_checks.x_robots_for(headers.get('x-robots-tag') or '', token))
+    return ' '.join(parts)
+
+
+def _bot_fetch(url, ua, timeout=15):
+    """One request with a given user agent, fresh session, no cookies."""
+    t0 = time.time()
+    headers = {'User-Agent': ua, 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+               'Accept-Language': 'en'}
+    try:
+        try:
+            resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        except requests.exceptions.SSLError:
+            resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True, verify=False)
+    except requests.RequestException as e:
+        return {'error': str(e)[:160], 'ms': int((time.time() - t0) * 1000)}
+    snap = {
+        'status': resp.status_code,
+        'final_url': resp.url,
+        'hops': len(resp.history),
+        'ms': int((time.time() - t0) * 1000),
+        'bytes': len(resp.content or b''),
+        'cdn': resp.headers.get('cf-mitigated') or '',
+    }
+    snap['waf'] = _detect_waf_block(resp) or ''
+    snap['challenge'] = bool(snap['cdn'] == 'challenge' or _is_challenge_response(resp))
+    ctype = (resp.headers.get('Content-Type') or '').lower()
+    html = _decoded_html(resp) if ('html' in ctype or not ctype) else ''
+    snap['_html'] = html
+    snap['_headers'] = {k.lower(): v for k, v in resp.headers.items()}
+    return snap
+
+
+def _bot_read(snap, token, base_url):
+    """Fields compared between agents, parsed from one response."""
+    html = snap.get('_html') or ''
+    soup = BeautifulSoup(html, 'html.parser')
+    t = soup.find('title')
+    h1 = soup.find('h1')
+    can = soup.find('link', attrs={'rel': 'canonical'})
+    # The title is compared as its own field, so it stays out of the text:
+    # otherwise one changed title also reads as changed copy.
+    text = _content_text(_re.sub(r'<title[^>]*>.*?</title>', ' ', html, flags=_re.S | _re.I))
+    words = text.split()
+    low = [w.lower() for w in words[:5000]]
+    directives = _bot_directives(soup, snap.get('_headers') or {}, token)
+    return {
+        'title': ' '.join(t.get_text(' ', strip=True).split()) if t else '',
+        'h1': ' '.join(h1.get_text(' ', strip=True).split()) if h1 else '',
+        'canonical': urljoin(snap.get('final_url') or base_url, can.get('href', '').strip()) if can and can.get('href') else '',
+        'noindex': 'noindex' in directives or _re.search(r'(^|[\s,])none([\s,]|$)', directives) is not None,
+        'words': len(words),
+        'shingles': {' '.join(low[i:i + 3]) for i in range(max(0, len(low) - 2))},
+    }
+
+
+def _bot_similarity(a, b):
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _bot_compare(base, base_read, snap, read, base_selfsim):
+    """State of one agent's response against the browser's: blocked,
+    challenged, error, redirected, noindex, different, thinner or same."""
+    if snap.get('error'):
+        return {'state': 'error', 'detail': snap['error'][:120]}
+    status = snap.get('status') or 0
+    if snap.get('challenge') and base.get('status') == 200:
+        return {'state': 'challenged', 'status': status,
+                'detail': f"{'Cloudflare' if snap.get('cdn') or snap.get('waf') == 'cloudflare' else 'CDN'} challenge (HTTP {status})"}
+    if status in _BOT_BLOCK_STATUSES and base.get('status') == 200:
+        who = f", {snap['waf'].title()}" if snap.get('waf') else ''
+        return {'state': 'blocked', 'status': status, 'detail': f'HTTP {status}{who}'}
+    if status != (base.get('status') or 0):
+        return {'state': 'different', 'status': status, 'fields': ['status'],
+                'detail': f"HTTP {status}, a browser got {base.get('status')}"}
+    if _norm_url(snap.get('final_url') or '') != _norm_url(base.get('final_url') or ''):
+        return {'state': 'redirected', 'status': status, 'detail': f"to {snap.get('final_url')}"}
+    if read['noindex'] and not base_read['noindex']:
+        return {'state': 'noindex', 'status': status, 'detail': 'noindex applies to this crawler'}
+    fields = [f for f in ('title', 'h1', 'canonical') if (read[f] or '') != (base_read[f] or '')]
+    sim = _bot_similarity(base_read['shingles'], read['shingles'])
+    # How much of the crawler's text the browser also got. A cut-down copy
+    # of the browser's page scores high here and low on sim: that is a
+    # thinner page, not different content.
+    inside = (len(base_read['shingles'] & read['shingles']) / len(read['shingles'])) if read['shingles'] else 1.0
+    # A page that changes between two browser requests (rotating banners,
+    # dates, tokens) earns a looser text threshold.
+    threshold = min(0.8, base_selfsim - 0.15)
+    shorter = base_read['words'] >= 50 and read['words'] < 0.7 * base_read['words']
+    out = {'status': status, 'words': read['words'], 'sim': round(sim, 2)}
+    if sim < threshold and base_read['words'] >= 20 and not (shorter and inside >= 0.8):
+        fields.append('text')
+    if fields:
+        out.update(state='different', fields=fields, detail=', '.join('H1' if f == 'h1' else f for f in fields))
+        return out
+    if shorter:
+        out.update(state='thinner', detail=f"{read['words']} of {base_read['words']} words")
+        return out
+    out.update(state='same', detail='same page as a browser')
+    return out
+
+
+def _bot_page_issues(label, kind, cell):
+    """Issue strings for one agent on one page (none for a clean result)."""
+    k = _BOT_KIND_WORD.get(kind, kind)
+    s = cell.get('state')
+    if s == 'blocked':
+        return [f"{k} bot blocked: {label} ({cell.get('detail')})"]
+    if s == 'challenged':
+        return [f"{k} bot challenged: {label} ({cell.get('detail')})"]
+    if s == 'different':
+        return [f"{k} bot sees different content: {label} ({cell.get('detail')})"]
+    if s == 'thinner':
+        return [f"{k} bot sees a thinner page: {label} ({cell.get('detail')})"]
+    if s == 'redirected':
+        return [f"{k} bot redirected elsewhere: {label} ({cell.get('detail')})"]
+    if s == 'noindex':
+        return [f"noindex only for {label} (meta or X-Robots-Tag naming it)"]
+    return []
+
+
+def _bot_check_run(urls, delay=0.4, render=True):
+    """Generator of progress events, ending with {'type': 'result', 'report': ...}."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    live = [a for a in _BOT_AGENTS]
+    jobs = [(u, a[0], a[4]) for u in urls for a in live]
+    jobs += [(u, 'browser-again', _BOT_AGENTS[0][4]) for u in urls]
+    total = len(jobs) + (len(urls) if render else 0)
+    done = 0
+    snaps = {}
+
+    # Requests start at most once per `delay` seconds across all workers,
+    # the same per-host pace the crawl itself keeps.
+    pace = threading.Lock()
+    next_at = [0.0]
+
+    def run(job):
+        u, agent_id, ua = job
+        with pace:
+            now = time.time()
+            start = max(now, next_at[0])
+            next_at[0] = start + delay
+        if start > now:
+            time.sleep(start - now)
+        return job, _bot_fetch(u, ua)
+
+    yield {'type': 'progress', 'done': 0, 'total': total, 'msg': f'Checking {len(urls)} pages as {len(live) - 1} crawlers and a browser'}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for fut in as_completed([pool.submit(run, j) for j in jobs]):
+            (u, agent_id, _ua), snap = fut.result()
+            snaps[(u, agent_id)] = snap
+            done += 1
+            if done % 5 == 0 or done == len(jobs):
+                yield {'type': 'progress', 'done': done, 'total': total}
+
+    # robots.txt per agent
+    robots_groups, robots_note = None, None
+    try:
+        origin = '{0.scheme}://{0.netloc}'.format(urlparse(urls[0]))
+        rr = requests.get(origin + '/robots.txt', headers={'User-Agent': _BOT_AGENTS[0][4]}, timeout=10)
+        if rr.status_code == 200 and 'html' not in (rr.headers.get('Content-Type') or '').lower():
+            robots_groups = _parse_robots_groups(rr.text)
+        else:
+            robots_note = f'robots.txt returned HTTP {rr.status_code}, so every crawler is allowed by default.'
+            robots_groups = {}
+    except requests.RequestException as e:
+        robots_note = f'robots.txt could not be fetched ({str(e)[:80]}).'
+
+    # Rendered pages, for content that needs JavaScript.
+    rendered, notes = {}, []
+    if render:
+        renderer = None
+        try:
+            renderer = PlaywrightRenderer(user_agent=_BOT_AGENTS[0][4])
+        except Exception as e:
+            notes.append('Content that needs JavaScript was not measured: JS rendering is not installed '
+                         'here. Run one crawl with Render JS ticked to install it.')
+            app.logger.info(f'[bot-check] renderer unavailable: {e}')
+        if renderer is not None:
+            try:
+                for u in urls:
+                    html, err = renderer.render(u)
+                    rendered[u] = None if err else html
+                    done += 1
+                    yield {'type': 'progress', 'done': done, 'total': total}
+            finally:
+                _teardown_pw(renderer)
+
+    pages, page_issues = {}, {}
+    agent_meta = [{'id': a[0], 'label': a[1], 'kind': a[2], 'renders_js': a[3], 'live': True} for a in live]
+    agent_meta += [{'id': r[0], 'label': r[1], 'kind': r[2], 'renders_js': None, 'live': False} for r in _BOT_ROBOTS_ONLY]
+    for u in urls:
+        base = snaps.get((u, 'browser')) or {'error': 'no response'}
+        again = snaps.get((u, 'browser-again')) or {}
+        if base.get('error'):
+            pages[u] = {'baseline': {'error': base['error']}, 'cells': {}}
+            continue
+        base_read = _bot_read(base, None, u)
+        selfsim = _bot_similarity(base_read['shingles'], _bot_read(again, None, u)['shingles']) if again.get('_html') else 1.0
+        cells, issues = {}, []
+        reads = {}
+        for a in live[1:]:
+            aid, label, kind, _js, _ua, token = a
+            snap = snaps.get((u, aid)) or {'error': 'no response'}
+            read = _bot_read(snap, token, u) if not snap.get('error') else None
+            reads[aid] = (snap, read)
+            cell = _bot_compare(base, base_read, snap, read, selfsim) if read else _bot_compare(base, base_read, snap, None, selfsim)
+            cells[aid] = cell
+            if aid != 'googlebot-desktop':
+                issues += _bot_page_issues(label, kind, cell)
+        # robots.txt verdict for every agent, live or not
+        robots = {}
+        if robots_groups is not None:
+            for a in live[1:]:
+                robots[a[0]] = _robots_allows(*_robots_rules_for(robots_groups, a[5]), u)
+            for r in _BOT_ROBOTS_ONLY:
+                robots[r[0]] = _robots_allows(*_robots_rules_for(robots_groups, r[3]), u)
+        # Mobile-first: Googlebot smartphone against Googlebot desktop.
+        mobile = None
+        m_snap, m_read = reads.get('googlebot', (None, None))
+        d_snap, d_read = reads.get('googlebot-desktop', (None, None))
+        if m_read and d_read and (m_snap.get('status') == d_snap.get('status') == 200):
+            diff = [f for f in ('title', 'h1', 'canonical') if (m_read[f] or '') != (d_read[f] or '')]
+            if _norm_url(m_snap.get('final_url') or '') != _norm_url(d_snap.get('final_url') or ''):
+                diff.append('URL')
+            mobile = {'mobile_words': m_read['words'], 'desktop_words': d_read['words'], 'fields': diff}
+            mobile_issue = None
+            if diff:
+                mobile_issue = f"Mobile and desktop pages differ ({', '.join('H1' if f == 'h1' else f for f in diff)})"
+            elif d_read['words'] >= 50 and m_read['words'] < 0.7 * d_read['words']:
+                mobile_issue = f"Mobile page has less content than desktop ({m_read['words']} of {d_read['words']} words)"
+            if mobile_issue:
+                issues.append(mobile_issue)
+                # When desktop Googlebot gets the browser's page, the gap is the
+                # mobile version, not Googlebot: one finding, not two.
+                if cells.get('googlebot-desktop', {}).get('state') == 'same':
+                    gb = [i for i in _bot_page_issues('Googlebot smartphone', 'search', cells.get('googlebot', {}))]
+                    issues = [i for i in issues if i not in gb]
+        # JavaScript: raw HTML against the rendered page.
+        js = None
+        if render and rendered.get(u):
+            r_html = rendered[u]
+            r_words = len(_content_text(r_html).split())
+            r_soup = BeautifulSoup(r_html, 'html.parser')
+            r_noindex = 'noindex' in _bot_directives(r_soup, {}, None)
+            js = {'raw_words': base_read['words'], 'rendered_words': r_words}
+            if r_words >= 50 and base_read['words'] < 0.5 * r_words:
+                issues.append(f"Content needs JavaScript (crawlers that do not run it see "
+                              f"{base_read['words']} of {r_words} words)")
+            raw_meta_noindex = 'noindex' in _bot_directives(BeautifulSoup(base.get('_html') or '', 'html.parser'), {}, None)
+            if raw_meta_noindex and not r_noindex:
+                js['noindex_removed'] = True
+                issues.append('noindex in the HTML is removed by JavaScript (Google may skip rendering '
+                              'a noindex page, so it can stay out of the index)')
+        pages[u] = {
+            'baseline': {'status': base.get('status'), 'words': base_read['words'], 'title': base_read['title'],
+                         'final_url': base.get('final_url'), 'selfsim': round(selfsim, 2)},
+            'cells': cells, 'robots': robots, 'mobile': mobile, 'js': js,
+        }
+        if issues:
+            page_issues[u] = issues
+
+    verdicts = {}
+    for a in live[1:]:
+        counts = {}
+        for u in urls:
+            st = ((pages.get(u) or {}).get('cells') or {}).get(a[0], {}).get('state')
+            if st:
+                counts[st] = counts.get(st, 0) + 1
+        n = sum(counts.values())
+        worst = next((s for s in ('blocked', 'challenged', 'noindex', 'different', 'redirected', 'thinner', 'error')
+                      if counts.get(s)), 'same')
+        verdicts[a[0]] = {'state': worst, 'counts': counts, 'checked': n}
+    report = {
+        'checked_at': int(time.time()),
+        'sample': urls,
+        'agents': agent_meta,
+        'pages': pages,
+        'verdicts': verdicts,
+        'page_issues': page_issues,
+        'robots_note': robots_note,
+        'rendered': bool(rendered),
+        'notes': notes,
+    }
+    yield {'type': 'result', 'report': report}
+
+
+@app.route('/bot-check', methods=['POST'])
+def bot_check():
+    """Stream the bot readability check. Body: {"urls": [...]} to check given
+    pages, or {"results": [...rows], "sample": 10} to pick a sample."""
+    data = request.get_json(silent=True) or {}
+    urls = [u for u in (data.get('urls') or []) if isinstance(u, str) and _HAS_SCHEME_RE.match(u)]
+    if not urls:
+        try:
+            n = max(1, min(int(data.get('sample') or 10), 100))
+        except (TypeError, ValueError):
+            n = 10
+        urls = _bot_sample(data.get('results') or [], n)
+    urls = urls[:100]
+    if not urls:
+        return jsonify({'error': 'No crawled HTML pages returning 200 to check.'}), 400
+    try:
+        delay = max(0.0, min(float(data.get('delay', 0.4)), 5.0))
+    except (TypeError, ValueError):
+        delay = 0.4
+    render = data.get('render', True) is not False
+
+    def generate():
+        try:
+            for ev in _bot_check_run(urls, delay=delay, render=render):
+                yield f"data: {json.dumps(ev)}\n\n"
+        except Exception as e:
+            app.logger.exception('[bot-check] failed')
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)[:200]})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
 @app.route('/crawl', methods=['POST'])

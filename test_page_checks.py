@@ -130,6 +130,32 @@ dirs = pc.directive_issues(
 check('conflicting directives', has(dirs, 'Conflicting robots directives'))
 check('nosnippet', has(dirs, 'nosnippet'))
 check('x-robots noindex', has(dirs, 'X-Robots-Tag'))
+
+# X-Robots-Tag sections aimed at one crawler (Google's documented format)
+check('unscoped directives apply to every crawler',
+      pc.x_robots_for('noindex, nofollow', 'googlebot') == {'noindex', 'nofollow'})
+check('a crawler section applies to that crawler',
+      'noindex' in pc.x_robots_for('googlebot: noindex, nofollow', 'googlebot'))
+check('a crawler section does not apply to others',
+      'noindex' not in pc.x_robots_for('bingbot: noindex', 'googlebot'))
+check('valued directives are not crawler names',
+      pc.parse_x_robots('max-snippet: 20, noarchive') == {None: {'max-snippet: 20', 'noarchive'}})
+scoped = pc.directive_issues(soup_of(''), {'x-robots-tag': 'bingbot: noindex'}, result())
+check('a bingbot-only noindex is not reported as a site-wide noindex',
+      not has(scoped, 'noindex in the X-Robots-Tag') and has(scoped, 'noindex only for Bingbot'))
+check('a googlebot meta noindex is reported', has(pc.directive_issues(
+    soup_of('<meta name="googlebot" content="noindex">'), {}, result()), 'noindex only for Googlebot'))
+
+# Directives reported with the AI meaning their owners document
+ai = pc.directive_issues(
+    soup_of('<meta name="robots" content="noarchive, nocache, max-snippet:20"><p data-nosnippet>x</p>'),
+    {}, result())
+check('noarchive names Bing Copilot', has(ai, 'noarchive (Bing keeps the page out of Copilot'))
+check('nocache is reported', has(ai, 'nocache (Bing Copilot shows only'))
+check('a low max-snippet is reported', has(ai, 'max-snippet limits the text Google can show'))
+check('data-nosnippet sections are counted', has(ai, '(1 section(s))'))
+check('max-snippet:-1 (no limit) is quiet', not has(pc.directive_issues(
+    soup_of('<meta name="robots" content="max-snippet:-1">'), {}, result()), 'max-snippet'))
 check('none directive', has(pc.directive_issues(
     soup_of('<meta name="robots" content="none">'), {}, result()), '"none"'))
 check('past unavailable_after', has(pc.directive_issues(

@@ -116,6 +116,23 @@ try:
 except urllib.error.HTTPError as e:
     sitemap = {'http_error': e.code}
 
+# ── bot readability, through the streaming route the UI calls ────────────────
+BOT_PAGES = ['/about/', '/bot-blocked/', '/bot-cloaked/', '/bot-thin/', '/bot-mobile-thin/',
+             '/bot-redirect/', '/bot-noindex/', '/bot-js/', '/bot-noindex-js/']
+bots, bot_progress = {}, 0
+with post('/bot-check', {'urls': [BASE + p for p in BOT_PAGES], 'delay': 0}, timeout=300) as resp:
+    for raw in resp:
+        line = raw.decode('utf-8', 'replace').strip()
+        if not line.startswith('data: '):
+            continue
+        ev = json.loads(line[6:])
+        if ev.get('type') == 'progress':
+            bot_progress += 1
+        elif ev.get('type') == 'result':
+            bots = ev['report']
+        elif ev.get('type') == 'error':
+            bots = {'error': ev.get('error')}
+
 httpd.shutdown()
 
 
@@ -273,6 +290,53 @@ check('the no-JS parser reads JSON-LD (scripts used to be stripped first)',
 check('the no-JS parser reads microdata, as the main parser does',
       'CreativeWork' in _nojs['schema_types'])
 check('the no-JS word count still leaves scripts out', _nojs['word_count'] == 3)
+
+# ── bot readability ───────────────────────────────────────────────────────────
+def cell(path, agent):
+    return (((bots.get('pages') or {}).get(BASE + path) or {}).get('cells') or {}).get(agent) or {}
+
+
+def bot_issues(path):
+    return (bots.get('page_issues') or {}).get(BASE + path) or []
+
+
+check(f'the bot check returns a report (got {bots.get("error") or "one"})', 'pages' in bots)
+check('the bot check streams its progress', bot_progress >= 2)
+check('a clean page reads the same for every crawler',
+      all(cell('/about/', a).get('state') == 'same'
+          for a in ('googlebot', 'bingbot', 'applebot', 'oai-searchbot', 'perplexitybot', 'chatgpt-user', 'gptbot', 'ccbot')))
+check('a 403 for one crawler is reported as blocked', cell('/bot-blocked/', 'gptbot').get('state') == 'blocked')
+check('the block becomes an issue on the page',
+      any(i.startswith('Training bot blocked: GPTBot') for i in bot_issues('/bot-blocked/')))
+check('other crawlers on the blocked page are fine', cell('/bot-blocked/', 'perplexitybot').get('state') == 'same')
+check('a different title for one crawler is reported',
+      cell('/bot-cloaked/', 'googlebot').get('state') == 'different' and 'title' in cell('/bot-cloaked/', 'googlebot').get('fields', []))
+check('a cut-down page for one crawler is thinner, not different',
+      cell('/bot-thin/', 'perplexitybot').get('state') == 'thinner')
+check('a redirect for one crawler is reported', cell('/bot-redirect/', 'bingbot').get('state') == 'redirected')
+check('a noindex aimed at Googlebot applies to Googlebot only',
+      cell('/bot-noindex/', 'googlebot').get('state') == 'noindex' and cell('/bot-noindex/', 'bingbot').get('state') == 'same')
+check('mobile parity: a thin mobile page is reported',
+      any(i.startswith('Mobile page has less content than desktop') for i in bot_issues('/bot-mobile-thin/')))
+check('robots.txt: CCBot is disallowed on the bot pages only',
+      ((bots.get('pages') or {}).get(BASE + '/bot-blocked/') or {}).get('robots', {}).get('ccbot') is False
+      and ((bots.get('pages') or {}).get(BASE + '/about/') or {}).get('robots', {}).get('ccbot') is True)
+check('crawlers without a published user agent are robots.txt only',
+      any(a['id'] == 'claudebot' and not a['live'] for a in bots.get('agents', [])))
+if bots.get('rendered'):
+    check('content written by script is measured',
+          any(i.startswith('Content needs JavaScript') for i in bot_issues('/bot-js/')))
+    check('a noindex that script removes is reported',
+          any(i.startswith('noindex in the HTML is removed by JavaScript') for i in bot_issues('/bot-noindex-js/')))
+else:
+    check('without JS rendering the report says so', any('not measured' in n for n in bots.get('notes', [])))
+
+# AI directives, read on every crawled page during the crawl itself.
+check('noarchive is reported with its documented meaning', fires('/bot-ai-directives', 'noarchive (bing keeps the page out of copilot'))
+check('nocache is reported', fires('/bot-ai-directives', 'nocache (bing copilot shows only'))
+check('a small max-snippet is reported', fires('/bot-ai-directives', 'max-snippet limits the text google can show'))
+check('data-nosnippet sections are counted', fires('/bot-ai-directives', 'data-nosnippet keeps sections out of snippets and ai answers (1 section(s))'))
+check('a noindex aimed at Googlebot is caught in the crawl', fires('/bot-noindex', 'noindex only for googlebot'))
 
 # ── report ────────────────────────────────────────────────────────────────────
 if FAILURES:

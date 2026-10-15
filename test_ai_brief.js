@@ -71,6 +71,13 @@ env.crawlerSitemap = {
   warnings: [],
 };
 env.window._ndPairs = [{ url_a: "https://example.com/p1/", url_b: "https://example.com/p2/", similarity: 0.96 }];
+env.window.crawlerReports.bot_check = {
+  sample: ["https://example.com/p0/", "https://example.com/p1/"],
+  agents: [{ id: "browser", label: "Browser" }, { id: "gptbot", label: "GPTBot" }, { id: "googlebot", label: "Googlebot smartphone" }],
+  verdicts: { gptbot: { state: "blocked", counts: { blocked: 2 }, checked: 2 }, googlebot: { state: "same", counts: { same: 2 }, checked: 2 } },
+  page_issues: { "https://example.com/p0/": ["Training bot blocked: GPTBot (HTTP 403)"] },
+  notes: [],
+};
 
 const brief = build({});
 const [head, data] = brief.split("\n---\n");
@@ -90,6 +97,10 @@ check("redirect chains are listed", data.includes("[301] https://example.com/mid
 check("URL trap results are listed", data.includes("Root soft 404 (200 for a URL that cannot exist): yes"));
 check("sitemap findings are listed", data.includes("In the sitemap but not reached by any internal link (1): https://example.com/lost/"));
 check("near duplicates are listed", data.includes("96% similar: https://example.com/p1/ and https://example.com/p2/"));
+check("the bot check is summarised", data.includes("## Bot readability (2 sample pages)") && data.includes("- GPTBot: blocked on 2; same on 0"));
+check("bot check results say they are not the real crawlers", data.includes("CDNs can treat the real crawlers differently"));
+check("bot findings are listed per page", data.includes("- https://example.com/p0/: Training bot blocked: GPTBot (HTTP 403)"));
+check("a crawler that matched the browser says so", data.includes("- Googlebot smartphone: same as a browser on all 2 pages"));
 
 const tableRows = data.split("\n").filter((l) => l.startsWith("| https://"));
 check("the page table has a row per page", tableRows.length === env.crawlerResults.length);
