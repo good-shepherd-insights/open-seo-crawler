@@ -100,7 +100,7 @@ check("pages with most issues come first", tableRows[0].includes("/p22/"));
 check("the page table can be left out", !build({ pageTable: false }).includes("## Pages ("));
 check("the page table respects its limit", build({ pageLimit: 5 }).includes("## Pages (5 of 19, most issues first)"));
 check("a custom prompt replaces the default", build({ prompt: "Short prompt for {site}" }).includes("Short prompt for example.com"));
-check("no em or en dashes in the template text", !/[–—]/.test(brief));
+check("no em or en dashes in the template text", !/[\u2013\u2014]/.test(brief));
 
 env.crawlerResults = [];
 env.window.crawlerReports = {};
