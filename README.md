@@ -14,6 +14,12 @@ Built by [Puneet Singh](https://au.linkedin.com/in/puneet-singh0), a working SEO
 
 → One-line install on Linux, macOS, or Windows. Auto-starts on boot, auto-updates daily. Browser opens at `http://localhost:5002/` when done.
 
+![Crawl summary: every issue grouped by severity, with the count of affected pages](docs/screenshot-summary.png)
+
+![Bot Readability: what Googlebot, Bingbot, Applebot and the AI crawlers each get from a sample of pages](docs/screenshot-bot-readability.png)
+
+<sub>A 100-page test crawl of books.toscrape.com, a public scraping sandbox.</sub>
+
 ## How it compares
 
 | | Open SEO Crawler | Screaming Frog (free) | Screaming Frog (paid) | Sitebulb | Ahrefs Site Audit |
@@ -394,6 +400,8 @@ Screaming Frog, Sitebulb, Ahrefs, Shopify, WordPress, Yoast SEO, Rank Math, Webf
 ## About
 
 Open SEO Crawler is built and maintained by [Puneet Singh](https://au.linkedin.com/in/puneet-singh0), an SEO who uses it on real sites every week. Bug reports go in [GitHub Issues](https://github.com/puneetindersingh/open-seo-crawler/issues). For anything else, connect on [LinkedIn](https://au.linkedin.com/in/puneet-singh0).
+
+More free SEO tools from the same maker, including the SEO Side Panel Chrome extension and a WordPress plugin: **[puneetindersingh.github.io](https://puneetindersingh.github.io/)**
 
 ## Licence
 
