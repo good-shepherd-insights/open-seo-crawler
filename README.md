@@ -8,6 +8,8 @@
 
 **It is also an AI crawler checker.** Can AI search and Google read your pages? After each crawl, a sample of pages is requested as Googlebot, Bingbot, Applebot and every AI crawler that publishes its user agent (GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, CCBot). A page that a crawler is blocked from, challenged on, redirected away from or served a thinner version of gets flagged, and so does text that only appears after JavaScript runs. When the crawl is done, the **AI brief** button packs it into a summary and a ready-made prompt you can paste into any AI assistant.
 
+**Your AI assistant can drive it.** The repo ships an MCP server and a command-line tool, so Claude Code, Claude Desktop, Cursor and other MCP apps (or any script) can start crawls, read the issues and pull up any page without opening the browser. The crawler still calls no AI: your assistant calls the crawler. [Set it up](#use-it-from-an-ai-assistant-mcp-or-the-command-line).
+
 Built for SEO professionals, web developers, and site owners who want a real technical SEO audit that stays on their machine. Use it as a free SEO crawler for a single site or a recurring website crawler across your whole portfolio.
 
 Built by [Puneet Singh](https://au.linkedin.com/in/puneet-singh0), a working SEO. Questions, ideas or bugs you would rather talk through? Connect on LinkedIn.
@@ -46,6 +48,7 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
 
 ## What's new (recent additions)
 
+- **MCP server and command line**: connect Claude Code, Claude Desktop or any other MCP app to the crawler, or script it with `osc.py`. Start a crawl and follow it, read the Summary as data, filter pages by issue, open one page with its inlinks, compare two crawls, run the AI crawler check on any URL, export to .xlsx. Crawls started this way run the same checks as the browser and show up under Load. Standard-library Python, nothing extra to install. See [Use it from an AI assistant](#use-it-from-an-ai-assistant-mcp-or-the-command-line).
 - **AI crawler checker (bot readability)**: after every crawl, a sample of pages is requested as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents (OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot, CCBot). Blocks, CDN challenges, redirects, a different title or text, a thinner page or a noindex aimed at one crawler are flagged, as is content that only exists after JavaScript runs and a mobile page with less content than desktop. On by default for 10 pages.
 - **AI brief**: one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
 - **Every report exports**: Export view now works on every report tab (All Titles, Redirect Chains, Hreflang, Deep Pages and the rest), and the .xlsx workbook adds a sheet for each report that has rows.
@@ -334,6 +337,88 @@ The **Summary** tab auto-opens during the crawl and live-refreshes as pages come
 - A page-detail dock for any URL (click a row): metadata, issues, inlinks, outlinks
 - Sitemap + XLSX export buttons in the topbar
 
+## Use it from an AI assistant (MCP) or the command line
+
+Two files in the repo let other programs use the crawler that is already running on port 5002:
+
+- `mcp_server.py`, an MCP server. Your AI app starts it as a local program and talks to it over stdin and stdout, so no port is opened and there is nothing to log in to.
+- `osc.py`, the same tools as terminal commands, with `--json` on every command for scripts.
+
+Both need the crawler running (the one-line installers keep it running) and nothing beyond Python's standard library.
+
+### Connect an AI app
+
+Run this once. It prints the exact command and config block for your machine, and tells you whether the crawler is up:
+
+```bash
+~/open-seo-crawler/venv/bin/python3 ~/open-seo-crawler/osc.py setup
+```
+
+On Windows: `%USERPROFILE%\open-seo-crawler\venv\Scripts\python.exe %USERPROFILE%\open-seo-crawler\osc.py setup`
+
+**Claude Code** (MCP over stdio), one command:
+
+```bash
+claude mcp add --scope user open-seo-crawler -- ~/open-seo-crawler/venv/bin/python3 ~/open-seo-crawler/mcp_server.py
+```
+
+Then run `/mcp` in Claude Code and `open-seo-crawler` should show as connected. Ask something like "crawl example.com, 100 pages, and give me the ten fixes that matter most".
+
+**Claude Desktop** (MCP): open Settings, then Developer, then Edit Config, and add the server to `claude_desktop_config.json` with the full paths `osc.py setup` printed:
+
+```json
+{
+  "mcpServers": {
+    "open-seo-crawler": {
+      "command": "/home/you/open-seo-crawler/venv/bin/python3",
+      "args": ["/home/you/open-seo-crawler/mcp_server.py"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop so it loads the MCP server. On Windows the paths look like `C:\\Users\\you\\open-seo-crawler\\venv\\Scripts\\python.exe`, with the backslashes doubled inside JSON. Use the config file rather than Settings, Connectors: connectors are reached over the internet, and this server only runs on your computer.
+
+**Other MCP apps** (Cursor, VS Code, Windsurf and the rest): add the same command and arguments as a local (stdio) MCP server in the app's settings. Many apps take the `mcpServers` block above as it is; check your app's MCP docs for where it goes.
+
+If the crawler runs on another port or another machine, set `OSC_URL` (for example `http://office-pc:5002`) in the server's environment.
+
+### What your assistant can do
+
+| Tool | What it does |
+|---|---|
+| `start_crawl` | Crawl a site with the app's engine, settings and defaults. Returns a job id straight away |
+| `crawl_status`, `stop_crawl` | Follow a crawl; stop it and keep what was fetched, like the Stop button |
+| `list_crawls` | Saved crawls from the last 30 days, from the app or from here |
+| `crawl_summary` | The Summary tab as data: issues by severity with page counts and sample URLs, duplicates, redirect chains, sitemap gaps, near duplicates, bot readability |
+| `get_pages`, `get_page` | Filter pages by issue, severity, status code, URL or indexability; open one URL in full with its inlinks |
+| `get_brief` | The AI brief as Markdown |
+| `compare_crawls` | What changed between two crawls of a site |
+| `bot_check` | The AI crawler readability check for any URLs, no crawl needed |
+| `check_robots`, `detect_cms` | robots.txt and the CMS behind any URL |
+| `export_xlsx` | The .xlsx export, written to a path you choose |
+
+There is also an `seo_audit` prompt that loads the AI brief for a saved crawl. Apps that support MCP prompts show it as a slash command.
+
+A crawl started from an AI app runs exactly like one started in the browser: the same engine and defaults, then sitemap analysis, near-duplicate detection and the bot readability check, then the same auto-save, so it appears under **Load** in the app. robots.txt is respected unless you, or the AI at your request, turn it off. Read [Responsible use](#responsible-use) before letting an assistant crawl sites you don't own.
+
+### Command line
+
+```bash
+cd ~/open-seo-crawler
+venv/bin/python3 osc.py crawl https://example.com --max-pages 200   # crawl, save, print the summary
+venv/bin/python3 osc.py summary latest                               # issue counts for a saved crawl
+venv/bin/python3 osc.py pages latest --issue "Missing H1"            # which pages have it
+venv/bin/python3 osc.py page latest https://example.com/about/       # one page and its inlinks
+venv/bin/python3 osc.py brief latest --out brief.md                  # the AI brief as a file
+venv/bin/python3 osc.py compare <older crawl> <newer crawl>          # what changed
+venv/bin/python3 osc.py bots https://example.com/                    # AI crawler readability
+venv/bin/python3 osc.py export latest crawl.xlsx
+venv/bin/python3 osc.py list
+```
+
+Name a crawl with `latest`, a file name from `osc.py list`, or part of the site name (the newest match wins). Add `--json` to any command for machine-readable output. In a deploy pipeline, `osc.py crawl <staging URL> --fail-on error` exits with code 1 when any page has an error, so the deploy can stop there. Exit code 2 means the command itself failed, for example because the crawler isn't running.
+
 ## Use cases
 
 - **Pre-launch audit**: crawl a staging site, fix every Error before the redirect cutover.
@@ -381,6 +466,8 @@ Concurrency scales linearly up to about 8 workers before target server rate limi
 ## Privacy
 
 Runs entirely on your machine. No API calls, no accounts, no telemetry. The only HTTP requests made are to the target site you're crawling and to `api.github.com`, which the page asks for the latest commit SHA on this repo (at most once every 10 minutes) to show the update badge. Nothing about your crawls is sent.
+
+The MCP server and `osc.py` talk only to the crawler on your own machine. Once you connect an AI app, whatever the tools return (URLs, titles, headings, issues, some page text) goes to that app and its AI provider under your account with them. Text from crawled sites is labelled as data, not instructions, but it still comes from someone else's website, so keep your AI app's approval prompts on for tools that start crawls or write files.
 
 ## Responsible use
 
