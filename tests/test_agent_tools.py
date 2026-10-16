@@ -282,6 +282,24 @@ check('an unknown tool is a protocol error', r['error']['code'] == -32602)
 r = h({'jsonrpc': '2.0', 'id': 9, 'method': 'resources/list', 'params': MODERN})
 check('an unsupported method is method-not-found', r['error']['code'] == -32601)
 
+for value, want in (('', at.DEFAULT_URL), ('${user_config.crawler_url}', at.DEFAULT_URL),
+                    ('localhost:5002', 'http://localhost:5002'), ('http://office-pc:5002/', 'http://office-pc:5002'),
+                    ('not a url at all', at.DEFAULT_URL)):
+    os.environ['OSC_URL'] = value
+    check(f'OSC_URL {value!r} reads as {want}', at.base_url() == want)
+
+# The bundle, the registry entry and the code all carry one version.
+_manifest = json.load(open(os.path.join(REPO, 'mcpb', 'manifest.json'), encoding='utf-8'))
+_server = json.load(open(os.path.join(REPO, 'server.json'), encoding='utf-8'))
+check('manifest.json, server.json and agent_tools.VERSION agree',
+      _manifest['version'] == _server['version'] == at.VERSION == mcp_server.SERVER_INFO['version'])
+check('the registry entry points at this version\'s release asset',
+      _server['packages'][0]['identifier'].endswith(f'/mcp-v{at.VERSION}/open-seo-crawler-mcp.mcpb')
+      and len(_server['packages'][0]['fileSha256']) == 64)
+check('the bundle lists every tool the server serves',
+      sorted(t['name'] for t in _manifest['tools']) == sorted(mcp_server.TOOL_NAMES))
+check('the registry description fits its 100-character limit', len(_server['description']) <= 100)
+
 os.environ['OSC_URL'] = 'http://127.0.0.1:9'  # nothing listens on the discard port
 r = h({'jsonrpc': '2.0', 'id': 10, 'method': 'tools/call',
        'params': dict(MODERN, name='list_crawls', arguments={})})['result']

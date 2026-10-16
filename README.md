@@ -346,6 +346,8 @@ Two files in the repo let other programs use the crawler that is already running
 
 Both need the crawler running (the one-line installers keep it running) and nothing beyond Python's standard library.
 
+The server is listed in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.puneetindersingh/open-seo-crawler`, so MCP apps and directories that read the registry can find it.
+
 ### Connect an AI app
 
 Run this once. It prints the exact command and config block for your machine, and tells you whether the crawler is up:
@@ -364,7 +366,9 @@ claude mcp add --scope user open-seo-crawler -- ~/open-seo-crawler/venv/bin/pyth
 
 Then run `/mcp` in Claude Code and `open-seo-crawler` should show as connected. Ask something like "crawl example.com, 100 pages, and give me the ten fixes that matter most".
 
-**Claude Desktop** (MCP): open Settings, then Developer, then Edit Config, and add the server to `claude_desktop_config.json` with the full paths `osc.py setup` printed:
+**Claude Desktop, one click** (MCP extension): download `open-seo-crawler-mcp.mcpb` from the [latest MCP release](https://github.com/puneetindersingh/open-seo-crawler/releases?q=mcp-v) and install it from Settings, then Extensions, then Advanced settings, then Install Extension. It needs Python 3.10+ on the PATH and the crawler running. It asks for the crawler address; the default fits a normal install.
+
+**Claude Desktop by hand** (MCP config file): open Settings, then Developer, then Edit Config, and add the server to `claude_desktop_config.json` with the full paths `osc.py setup` printed:
 
 ```json
 {

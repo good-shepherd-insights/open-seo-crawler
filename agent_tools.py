@@ -70,7 +70,14 @@ class ToolError(Exception):
 # ── talking to the crawler app ────────────────────────────────────────────────
 
 def base_url():
-    return (os.environ.get('OSC_URL') or DEFAULT_URL).rstrip('/')
+    """The crawler's address. A blank value, or a settings placeholder an app
+    passed through unfilled (${...}), means the default; host:port gets http://."""
+    v = (os.environ.get('OSC_URL') or '').strip()
+    if v and '${' not in v and not re.match(r'^https?://', v, re.I) and re.match(r'^[\w.-]+(:\d+)?(/.*)?$', v):
+        v = 'http://' + v
+    if not re.match(r'^https?://[^\s/]+', v, re.I) or '${' in v:
+        v = DEFAULT_URL
+    return v.rstrip('/')
 
 
 def _not_running(err):
