@@ -169,7 +169,9 @@ def head_issues(raw_html):
 def duplicate_tag_issues(soup):
     """More than one of a tag that may only appear once."""
     out = []
-    titles = soup.find_all('title')
+    # An inline SVG's <title> is its accessible name (chart tooltips, icons),
+    # not a page title: a page with 30 chart points was called 31 titles.
+    titles = [t for t in soup.find_all('title') if not t.find_parent('svg')]
     if len(titles) > 1:
         out.append(f'Multiple title tags ({len(titles)})')
     cans = soup.find_all('link', attrs={'rel': 'canonical'})

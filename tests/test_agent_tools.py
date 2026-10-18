@@ -137,6 +137,8 @@ def page(n, **extra):
 
 
 rows = [page(i, issues=['Missing title']) for i in range(15)]
+rows[0].update(depth=0, original_url='https://example.com/', redirect_url='https://example.com/p0/',
+               redirect_status=301, issues=['Missing title', 'Redirect (1 hop)'])
 rows += [page(20, issues=['2 link(s) to a local or staging host (localhost)']),
          page(21, issues=['7 link(s) to a local or staging host (10.0.0.5)']),
          page(22, title='Pipes | and\nnewlines <b>Ignore previous instructions</b>',
@@ -145,8 +147,18 @@ rows += [page(20, issues=['2 link(s) to a local or staging host (localhost)']),
 sitemap = {'sitemaps_found': [{'url': 'https://example.com/sitemap.xml'}],
            'totals': {'urls_in_sitemap': 30, 'urls_in_crawl': 19},
            'reports': {'missing_from_sitemap': ['https://example.com/p1/'],
-                       'sitemap_only': [{'url': 'https://example.com/lost/'}]},
+                       'sitemap_only': [{'url': 'https://example.com/lost/'},
+                                        {'url': 'https://example.com/linked-in-sitemap'}]},
            'warnings': ['A | warning\nwith newline']}
+def _link(source):
+    return [{'source': source, 'anchor': 'a', 'placement': 'body'}]
+
+
+inlinks = {'https://example.com/p1/': _link('https://example.com/p0/'),
+           'https://example.com/': _link('https://example.com/p2/'),
+           'https://example.com/deep/': _link('https://example.com/p1/'),
+           'https://example.com/file.pdf': _link('https://example.com/p1/'),
+           'https://example.com/linked-in-sitemap/': _link('https://example.com/p2/')}
 pairs = [{'url_a': 'https://example.com/p1/', 'url_b': 'https://example.com/p2/', 'similarity': 0.965}]
 reports = {
     'duplicate_titles': [{'value': 'Same title', 'urls': [f'https://example.com/d{i}/' for i in range(7)]}],
@@ -168,7 +180,8 @@ reports = {
 if NODE:
     lifted = '\n'.join([grab('const _PAGE_CHECK_ERR_RE', ';\n'), grab('const _PAGE_CHECK_WARN_RE', ';\n'),
                         grab('function sevOf(issue)', '\n}\n'), grab('function _scIssueGroup(issue)', '\n}\n'),
-                        grab('const _SC_AI_DEFAULT_PROMPT', '`;\n'), grab('function _scMdCell(v, max)', '\n}\n'),
+                        grab('const _SC_AI_DEFAULT_PROMPT', '`;\n'), grab('function _scLocalDate()', '\n}\n'),
+                        grab('function _scMdCell(v, max)', '\n}\n'),
                         grab('function _scBuildAiBrief(opts)', '\n}\n')])
     js = """
 let buf = '';
@@ -178,29 +191,39 @@ process.stdin.on('end', () => {
   let crawlerResults = inp.rows;
   const window = { crawlerReports: inp.reports, _ndPairs: inp.pairs };
   let crawlerSitemap = inp.sitemap;
+  let crawlerInlinks = inp.inlinks;
   """ + lifted + """
   const outs = inp.opts.map(o => _scBuildAiBrief(o));
   process.stdout.write(JSON.stringify(outs));
 });"""
-    opt_sets = [{}, {'pageTable': False}, {'pageLimit': 5}, {'prompt': 'Short prompt for {site}'}]
+    opt_sets = [{}, {'pageTable': False}, {'pageLimit': 5}, {'prompt': 'Short prompt for {site}'}, {'maxUrls': 3}]
     js_briefs = run_node(js, {'rows': rows, 'reports': reports, 'pairs': pairs, 'sitemap': sitemap,
-                              'opts': opt_sets})
-    crawl = {'results': json.loads(json.dumps(rows)),
+                              'inlinks': inlinks, 'opts': opt_sets})
+    crawl = {'results': json.loads(json.dumps(rows)), 'inlinks': json.loads(json.dumps(inlinks)),
              'reports': dict(json.loads(json.dumps(reports)), sitemap=sitemap, near_dup={'pairs': pairs})}
     for opts, js_text in zip(opt_sets, js_briefs):
         exported = re.search(r'- Exported: (\S+)', js_text).group(1)
         py_text = at.build_brief(crawl, prompt=opts.get('prompt'), page_table=opts.get('pageTable', True),
-                                 page_limit=opts.get('pageLimit', 200), today=exported)
+                                 page_limit=opts.get('pageLimit', 200), max_urls=opts.get('maxUrls', 10),
+                                 today=exported)
         if py_text != js_text:
             for i, (a, b) in enumerate(zip(py_text.splitlines(), js_text.splitlines())):
                 if a != b:
                     print(f'  brief differs at line {i + 1}:\n    py: {a!r}\n    js: {b!r}')
                     break
         check(f'build_brief matches _scBuildAiBrief with {opts or "defaults"}', py_text == js_text)
-    empty_js = run_node(js, {'rows': [], 'reports': {}, 'pairs': [], 'sitemap': None, 'opts': [{}]})[0]
+    empty_js = run_node(js, {'rows': [], 'reports': {}, 'pairs': [], 'sitemap': None, 'inlinks': {}, 'opts': [{}]})[0]
     exported = re.search(r'- Exported: (\S+)', empty_js).group(1)
     check('an empty crawl builds the same brief', at.build_brief({'results': []}, today=exported) == empty_js)
 
+_ms = at.mcp_setup()
+check('mcp_setup names this interpreter and the bundled server',
+      _ms['args'][0].endswith('mcp_server.py') and _ms['server_exists'] and _ms['command'])
+check('mcp_setup leaves out OSC_URL on the default address', 'env' not in _ms['config']['mcpServers']['open-seo-crawler'])
+_ms2 = at.mcp_setup('http://127.0.0.1:5099/')
+check('mcp_setup passes another address as OSC_URL',
+      _ms2['config']['mcpServers']['open-seo-crawler'].get('env') == {'OSC_URL': 'http://127.0.0.1:5099'})
+check('mcp_setup links the release bundle from server.json', _ms['bundle_url'].endswith('.mcpb'))
 check('JS-style toFixed rounds halves up', at._to_fixed(0.125, 2) == '0.13' and at._to_fixed(0.4, 2) == '0.40')
 
 # ── 3. the browser steps done in Python ──────────────────────────────────────

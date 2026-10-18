@@ -80,6 +80,9 @@ same = pc.duplicate_tag_issues(soup_of(
     '<head><link rel="canonical" href="/a"><link rel="canonical" href="/a"></head>'))
 check('same canonical twice is not a conflict',
       has(same, 'Multiple canonical tags') and not has(same, 'conflicting'))
+check('SVG titles are not page titles', pc.duplicate_tag_issues(soup_of(
+    '<head><title>a</title></head><body><svg><title>Chart</title><g><title>Point 1</title></g></svg>'
+    '<svg><title>Icon</title></svg></body>')) == [])
 check('one of each is quiet', pc.duplicate_tag_issues(soup_of(
     '<head><title>a</title><meta name="description" content="1"></head>')) == [])
 

@@ -6,7 +6,7 @@
 
 **Open SEO Crawler is a free, open-source SEO crawler you run locally**: a self-hosted website SEO crawler and site audit tool that crawls any website for technical SEO issues. Fast, concurrent, and CMS-aware, it's a drop-in alternative to Screaming Frog, Sitebulb, and Ahrefs Site Audit, with no accounts, no API keys, no cloud, and no per-URL limits.
 
-**It is also an AI crawler checker.** Can AI search and Google read your pages? After each crawl, a sample of pages is requested as Googlebot, Bingbot, Applebot and every AI crawler that publishes its user agent (GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, CCBot). A page that a crawler is blocked from, challenged on, redirected away from or served a thinner version of gets flagged, and so does text that only appears after JavaScript runs. When the crawl is done, the **AI brief** button packs it into a summary and a ready-made prompt you can paste into any AI assistant.
+**It is also an AI crawler checker.** Can AI search and Google read your pages? After each crawl, a sample of pages is requested as Googlebot, Bingbot, Applebot and every AI crawler that publishes its user agent (GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, CCBot). A page that a crawler is blocked from, challenged on, redirected away from or served a thinner version of gets flagged, and so does text that only appears after JavaScript runs. When the crawl is done, the **Use with AI** button packs it into a summary and a ready-made prompt you can paste into any AI assistant, or hands you a setup prompt that connects your AI app to the crawler so it can run crawls itself.
 
 **Your AI assistant can drive it.** The repo ships an MCP server and a command-line tool, so Claude Code, Claude Desktop, Cursor and other MCP apps (or any script) can start crawls, read the issues and pull up any page without opening the browser. The crawler still calls no AI: your assistant calls the crawler. [Set it up](#use-it-from-an-ai-assistant-mcp-or-the-command-line).
 
@@ -48,9 +48,13 @@ No account, no API key, no telemetry. Crawl the site here to find the pages with
 
 ## What's new (recent additions)
 
+- **Use with AI, two ways**: the top bar button now opens on a choice. *Paste a brief* copies the crawl as a Markdown brief for any AI chat. *Connect an AI app* gives a setup prompt with this computer's exact command and paths: paste it into an AI app that can run commands and it adds the MCP server itself. The command and the settings block are there to copy too, for setting it up by hand.
+- **Crawl progress and a live Summary**: a bar under the top bar shows how far a crawl has got (pages crawled against crawled plus queued, capped at the page limit), the queue, the time so far and an estimate of the time left. A new crawl opens on the Summary, which fills in as pages arrive.
+- **Pages reached through a redirect are now checked**: the crawler stores a followed redirect under the page it landed on, but skipped that page's content checks, so a start URL that redirects (example.com to www.example.com, or to a language folder) never had its title, meta description, H1, canonical or Open Graph checked. It does now, and those pages also count in the duplicate reports, the sitemap comparison and the exported sitemap.
+- **A truer AI brief**: it names the start URL and where it redirects, says when the crawl stopped before reaching every linked page (so URLs it never reached are not called orphans), lists an issue that hits almost every page as the few pages without it, keeps `|` in titles as written, and dates the export in your own time zone. The sitemap report's *In sitemap, not crawled* list now says how many crawled pages link to each URL.
 - **MCP server and command line**: connect Claude Code, Claude Desktop or any other MCP app to the crawler, or script it with `osc.py`. Start a crawl and follow it, read the Summary as data, filter pages by issue, open one page with its inlinks, compare two crawls, run the AI crawler check on any URL, export to .xlsx. Crawls started this way run the same checks as the browser and show up under Load. Standard-library Python, nothing extra to install. See [Use it from an AI assistant](#use-it-from-an-ai-assistant-mcp-or-the-command-line).
 - **AI crawler checker (bot readability)**: after every crawl, a sample of pages is requested as a browser and as Googlebot, Bingbot, Applebot and the AI crawlers that publish their user agents (OAI-SearchBot, PerplexityBot, ChatGPT-User, GPTBot, CCBot). Blocks, CDN challenges, redirects, a different title or text, a thinner page or a noindex aimed at one crawler are flagged, as is content that only exists after JavaScript runs and a mobile page with less content than desktop. On by default for 10 pages.
-- **AI brief**: one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
+- **AI brief** (now under *Use with AI*): one click turns the crawl into a compact Markdown brief with a ready-made prompt, to paste into any AI assistant for a ranked list of fixes. Issues are grouped the way the Summary groups them and URL lists are capped, so the brief fits a chat window. The crawler itself calls no AI and sends nothing anywhere.
 - **Every report exports**: Export view now works on every report tab (All Titles, Redirect Chains, Hreflang, Deep Pages and the rest), and the .xlsx workbook adds a sheet for each report that has rows.
 - **Safer and steadier**: crawled titles, URLs and robots.txt lines can no longer run script inside the app, other websites can no longer trigger Update or Restart, the Update button restarts cleanly under systemd and launchd, and sitemap analysis works again.
 - **Malformed link href detection**: a scheme-less `href` containing a raw space (a street address or Google Maps Plus Code pasted straight into a link, e.g. `<a href="7FG4+8Q Springfield">Directions</a>`) used to resolve relative to every page carrying it and flood the crawl with phantom 404s. One broken footer link on a 300-page site meant ~300 fake 404 rows. Now it's skipped as a link and reported once per page as a **Malformed link href** issue naming the offending text.
@@ -161,7 +165,7 @@ Every report exports to XLSX so you can hand it to a content team or dev:
 - **Page detail dock**: click any URL for full page metadata, all issues for that page, inlinks (with anchor text), outlinks.
 - **Dark mode**: toggle in the topbar, persists per user.
 - **Saved crawls**: every crawl auto-saved, reopenable from the Load Saved modal, with the date it was saved shown when you open one.
-- **AI brief**: copy or download a compact brief of the crawl, with an editable prompt, for any AI assistant.
+- **Use with AI**: copy or download a compact brief of the crawl, with an editable prompt, for any AI assistant; or copy a setup prompt that connects an AI app to the crawler over MCP.
 - **Sitemap + XLSX export buttons** in the topbar, one click each.
 
 ## Quick install (manual)
@@ -350,7 +354,9 @@ The server is listed in the official [MCP Registry](https://registry.modelcontex
 
 ### Connect an AI app
 
-Run this once. It prints the exact command and config block for your machine, and tells you whether the crawler is up:
+The quickest way: click **Use with AI** in the top bar, open **Connect an AI app** and copy the setup prompt. It carries the exact command and paths for your machine. Paste it into an AI app that can run commands on your computer, and the app adds the MCP server with its own command, checks it connects and tells you if it needs a restart.
+
+To do it by hand, run this once. It prints the exact command and config block for your machine, and tells you whether the crawler is up:
 
 ```bash
 ~/open-seo-crawler/venv/bin/python3 ~/open-seo-crawler/osc.py setup

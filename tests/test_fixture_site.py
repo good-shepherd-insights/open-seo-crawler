@@ -206,6 +206,10 @@ check('the canonical fragment is found',
       fires('/canonical-fragment', 'canonical contains a fragment'))
 check('a canonical naming a 404 is found',
       fires('/canonical-to-404', 'canonical points to a non-200'))
+# /old-url/ redirects to /redirect-target/, which nothing else links to. The row
+# is stored under the landing URL, so it is a page and gets the content checks.
+check('a page reached only through a redirect still gets the content checks',
+      fires('/redirect-target/', 'title too short'))
 check('a canonical naming a redirect is found',
       fires('/canonical-to-redirect', 'canonical points to a url that redirects'))
 check('a canonical naming a noindex page is found',
@@ -273,6 +277,9 @@ check('a sitemap URL that redirects is reported',
       in_report('redirects_in_sitemap', '/old-url/'))
 check('a sitemap URL no page links to is reported',
       in_report('sitemap_only', '/sitemap-only/') or in_report('orphan_in_sitemap', '/sitemap-only/'))
+_only = [v for v in (reports.get('sitemap_only') or []) if isinstance(v, dict) and _key(v.get('url')) == _key(BASE + '/sitemap-only/')]
+check('a sitemap URL the crawl never fetched says how many crawled pages link to it',
+      not _only or _only[0].get('linked_from') == 0)
 check('a crawled page the sitemap leaves out is reported',
       in_report('missing_from_sitemap', '/clean-second/'))
 check('a page the sitemap lists is not called missing',

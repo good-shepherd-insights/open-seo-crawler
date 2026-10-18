@@ -680,6 +680,20 @@ def version():
     })
 
 
+@app.route('/mcp-setup')
+def mcp_setup_info():
+    """What the "Use with AI" panel needs to connect an AI app over MCP: the
+    command for this machine, the mcpServers block and the bundle link. The
+    MCP server runs beside the app and reaches it on loopback, so the address
+    is 127.0.0.1 on this app's own port, whatever address the page was opened
+    on. Same data as `osc.py setup`."""
+    import agent_tools
+    port = request.environ.get('SERVER_PORT') or '5002'
+    info = agent_tools.mcp_setup(f'http://127.0.0.1:{port}')
+    info['same_machine'] = (request.remote_addr or '') in ('127.0.0.1', '::1')
+    return jsonify(info)
+
+
 @app.route('/update', methods=['POST'])
 def update_self():
     """Reconcile the local checkout to origin/master and report the result.
@@ -2756,8 +2770,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
 
         # Issues detection — skip content/SEO checks for noindex or pagination pages
         # (noindex = Google won't rank it; pagination = archive duplicate, not a canonical page)
-        # Also skip URLs that redirected: the resolved target is crawled separately and
-        # any content issues belong on that row, not on the 301 source.
+        # Also skip rows that stand for a redirect source (see _redirect_source).
         # When ignore_noindex is set, treat noindex pages like indexable ones for
         # the audit so the user sees the full warning/info list, not just the flag.
         # ALSO skip canonicalised pages — they're declared duplicates so any
@@ -2771,7 +2784,17 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         # description / Missing title / Missing H1" even though the source is
         # just a redirect that never returns HTML.
         _status = result.get('status_code', 0) or 0
-        if (result['indexable'] or ignore_noindex) and not result.get('is_pagination') and not result.get('redirect_url') and not is_canonicalised and 200 <= _status < 300:
+        # A followed redirect is stored under the page it landed on (result['url']
+        # = resp.url above), so that row IS the landing page and gets the content
+        # checks. Skipping every row with a redirect_url left any page reached
+        # through a redirect unchecked, the start URL above all (example.com ->
+        # www.example.com). Skip only a row that stands for the source: a recrawl
+        # keeps the requested address, and a redirect off the site lands on
+        # someone else's page.
+        _rd = result.get('redirect_url')
+        _redirect_source = _is_redirect_source(result) or bool(
+            _rd and urlparse(_rd).netloc.lower().replace('www.', '') != domain)
+        if (result['indexable'] or ignore_noindex) and not result.get('is_pagination') and not _redirect_source and not is_canonicalised and 200 <= _status < 300:
             if not result['title']:
                 result['issues'].append('Missing title')
             elif result['title_len'] > 60:
@@ -2853,7 +2876,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         _content_ok = bool(
             (result['indexable'] or ignore_noindex)
             and not result.get('is_pagination')
-            and not result.get('redirect_url')
+            and not _redirect_source
             and not is_canonicalised
             and 200 <= _status < 300)
         try:
@@ -3198,6 +3221,18 @@ def _norm_url(u):
         return u.rstrip('/').lower()
 
 
+def _is_redirect_source(r):
+    """True when a row stands for a redirect's source rather than a page.
+
+    The crawler follows redirects and stores the row under the URL it landed
+    on, with redirect_url set to that same URL (and original_url to where it
+    started). So redirect_url alone does not make a row a redirect: that row is
+    the landing page, often the start page itself (example.com -> www).
+    """
+    rd = r.get('redirect_url')
+    return bool(rd) and _norm_url(rd) != _norm_url(r.get('url') or '')
+
+
 @app.route('/fetch-robots-txt', methods=['GET'])
 def fetch_robots_txt():
     """Fetch a site's robots.txt for the URL filters preview panel."""
@@ -3353,7 +3388,7 @@ def sitemap_analyse():
             continue
         if sc and sc != 200:
             continue
-        if r.get('redirect_url'):
+        if _is_redirect_source(r):
             continue
         if r.get('is_pagination'):
             continue
@@ -3382,7 +3417,10 @@ def sitemap_analyse():
             pagination_in_sitemap.append(original_url)
         crawled = crawl_by_norm.get(nrm) or redirected_from.get(nrm) or canonical_to_row.get(nrm)
         if crawled is None:
-            sitemap_only.append({'url': original_url, 'lastmod': entry.get('lastmod')})
+            # Not crawled is not the same as not linked: a capped crawl stops
+            # before pages it has already found links to.
+            sitemap_only.append({'url': original_url, 'lastmod': entry.get('lastmod'),
+                                 'linked_from': len(inlinks_by_norm.get(nrm) or [])})
             continue
         sc = crawled.get('status_code') or 0
         if sc and sc != 200:
@@ -3403,7 +3441,7 @@ def sitemap_analyse():
                 'url': original_url,
                 'reason': 'noindex',
             })
-        if (sc == 200 and not crawled.get('redirect_url')
+        if (sc == 200 and _norm_url(crawled.get('url')) == nrm and not _is_redirect_source(crawled)
                 and crawled.get('indexable', True)
                 and not inlinks_by_norm.get(nrm)):
             orphan_in_sitemap.append(original_url)
@@ -4874,7 +4912,7 @@ def crawl_site():
             for r in results:
                 if not (r.get('indexable', True) or ignore_noindex):
                     continue
-                if r.get('redirect_url'):
+                if _is_redirect_source(r):
                     continue
                 if r.get('status_code') and r['status_code'] >= 300:
                     continue
@@ -5755,7 +5793,7 @@ def export_crawl_sitemap():
             return False
         if r.get('error'):
             return False
-        if r.get('redirect_url'):
+        if _is_redirect_source(r):
             return False
         if r.get('indexable') is False:
             return False

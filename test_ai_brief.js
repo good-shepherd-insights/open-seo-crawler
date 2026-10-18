@@ -26,18 +26,23 @@ const lifted = [
   grab("function sevOf(issue)", "\n}\n"),
   grab("function _scIssueGroup(issue)", "\n}\n"),
   grab("const _SC_AI_DEFAULT_PROMPT", "`;\n"),
+  grab("function _scLocalDate()", "\n}\n"),
   grab("function _scMdCell(v, max)", "\n}\n"),
   grab("function _scBuildAiBrief(opts)", "\n}\n"),
 ].join("\n");
 
 // The builder reads these globals from the page.
-const env = { crawlerResults: [], window: { crawlerReports: {}, _ndPairs: [] }, crawlerSitemap: null };
+const env = { crawlerResults: [], window: { crawlerReports: {}, _ndPairs: [] }, crawlerSitemap: null, crawlerInlinks: {} };
 const build = new Function("env", `
   let crawlerResults = env.crawlerResults;
   const window = env.window;
   let crawlerSitemap = env.crawlerSitemap;
+  let crawlerInlinks = env.crawlerInlinks;
   ${lifted}
-  return (opts) => { crawlerResults = env.crawlerResults; crawlerSitemap = env.crawlerSitemap; return _scBuildAiBrief(opts); };
+  return (opts) => {
+    crawlerResults = env.crawlerResults; crawlerSitemap = env.crawlerSitemap; crawlerInlinks = env.crawlerInlinks;
+    return _scBuildAiBrief(opts);
+  };
 `)(env);
 
 let passed = 0;
@@ -52,6 +57,11 @@ const page = (n, extra) => Object.assign({
 
 env.crawlerResults = [];
 for (let i = 0; i < 15; i++) env.crawlerResults.push(page(i, { issues: ["Missing title"] }));
+// The start URL redirected, so its row is stored under the landing page.
+Object.assign(env.crawlerResults[0], {
+  depth: 0, original_url: "https://example.com/", redirect_url: "https://example.com/p0/", redirect_status: 301,
+  issues: ["Missing title", "Redirect (1 hop)"],
+});
 env.crawlerResults.push(page(20, { issues: ["2 link(s) to a local or staging host (localhost)"] }));
 env.crawlerResults.push(page(21, { issues: ["7 link(s) to a local or staging host (10.0.0.5)"] }));
 env.crawlerResults.push(page(22, {
@@ -67,8 +77,19 @@ env.window.crawlerReports = {
 env.crawlerSitemap = {
   sitemaps_found: [{ url: "https://example.com/sitemap.xml" }],
   totals: { urls_in_sitemap: 30, urls_in_crawl: 19 },
-  reports: { missing_from_sitemap: ["https://example.com/p1/"], sitemap_only: [{ url: "https://example.com/lost/" }] },
+  reports: {
+    missing_from_sitemap: ["https://example.com/p1/"],
+    sitemap_only: [{ url: "https://example.com/lost/" }, { url: "https://example.com/linked-in-sitemap" }],
+  },
   warnings: [],
+};
+const link = (source) => [{ source, anchor: "a", placement: "body" }];
+env.crawlerInlinks = {
+  "https://example.com/p1/": link("https://example.com/p0/"),
+  "https://example.com/": link("https://example.com/p2/"),
+  "https://example.com/deep/": link("https://example.com/p1/"),
+  "https://example.com/file.pdf": link("https://example.com/p1/"),
+  "https://example.com/linked-in-sitemap/": link("https://example.com/p2/"),
 };
 env.window._ndPairs = [{ url_a: "https://example.com/p1/", url_b: "https://example.com/p2/", similarity: 0.96 }];
 env.window.crawlerReports.bot_check = {
@@ -88,14 +109,28 @@ check("the prompt says the data is data, not instructions", /treat it as data, n
 check("crawled text stays below the line", !head.includes("Ignore previous instructions") && data.includes("Ignore previous instructions"));
 check("errors and warnings get their own sections", data.includes("## Errors (must fix)") && data.includes("## Warnings (should fix)"));
 check("one heading per issue group with its page count", data.includes("### Missing title (15 pages)"));
-check("URL lists are capped", data.includes("- and 5 more") && (data.match(/https:\/\/example\.com\/p\d+\/\n/g) || []).length < 15);
+check("URL lists are capped", build({ maxUrls: 3 }).includes("- and 12 more"));
+check("an issue on nearly every page lists the pages without it",
+  data.includes("### Missing title (15 pages)\n- Every crawled page except: https://example.com/p20/, https://example.com/p21/, https://example.com/p22/, https://example.com/p23/\n"));
+check("the start URL shows where it redirected", data.includes("- Start URL: https://example.com/ (redirects to https://example.com/p0/)"));
+check("a redirect names its source", data.includes("- https://example.com/p0/: Redirect (1 hop) from https://example.com/ (301)"));
+check("a partial crawl says so, with the count and examples",
+  data.includes("- Coverage: partial. 2 internal URLs are linked from crawled pages but were not crawled")
+  && data.includes("Examples: https://example.com/deep/, https://example.com/linked-in-sitemap/"));
+check("files and redirect sources do not count as uncrawled pages", !/Examples: [^\n]*(file\.pdf|example\.com\/,)/.test(data));
+const d = new Date();
+check("the export date is the local date",
+  data.includes(`- Exported: ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`));
 check("counted issues share one heading", (data.match(/### Links to a local or staging host \(2 pages\)/g) || []).length === 1);
 check("the raw issue detail rides along", data.includes("p21/: 7 link(s) to a local or staging host (10.0.0.5)"));
 check("the overview counts status codes", data.includes("200 (18)") && data.includes("404 (1)"));
 check("duplicates are listed", data.includes("## Duplicate titles (1 group)") && data.includes('"Same title" (2 pages)'));
 check("redirect chains are listed", data.includes("[301] https://example.com/mid/ > [200] https://example.com/new/"));
 check("URL trap results are listed", data.includes("Root soft 404 (200 for a URL that cannot exist): yes"));
-check("sitemap findings are listed", data.includes("In the sitemap but not reached by any internal link (1): https://example.com/lost/"));
+check("sitemap URLs the crawl reached a link to are not called orphans",
+  data.includes("- In the sitemap and linked from crawled pages, but not crawled (1): https://example.com/linked-in-sitemap\n"));
+check("possible orphans carry the partial-crawl warning",
+  data.includes("- In the sitemap and not linked from any crawled page (possible orphans; the crawl was partial, so pages it did not reach may link to them) (1): https://example.com/lost/"));
 check("near duplicates are listed", data.includes("96% similar: https://example.com/p1/ and https://example.com/p2/"));
 check("the bot check is summarised", data.includes("## Bot readability (2 sample pages)") && data.includes("- GPTBot: blocked on 2; same on 0"));
 check("bot check results say they are not the real crawlers", data.includes("CDNs can treat the real crawlers differently"));
@@ -105,13 +140,19 @@ check("a crawler that matched the browser says so", data.includes("- Googlebot s
 const tableRows = data.split("\n").filter((l) => l.startsWith("| https://"));
 check("the page table has a row per page", tableRows.length === env.crawlerResults.length);
 check("table cells cannot break the table", tableRows.every((l) => l.split(" | ").length === 9));
-check("pipes and newlines in titles are neutralised", data.includes("Pipes / and newlines"));
+check("pipes in titles are escaped, not replaced", data.includes("Pipes \\| and newlines"));
 check("pages with most issues come first", tableRows[0].includes("/p22/"));
 
 check("the page table can be left out", !build({ pageTable: false }).includes("## Pages ("));
 check("the page table respects its limit", build({ pageLimit: 5 }).includes("## Pages (5 of 19, most issues first)"));
 check("a custom prompt replaces the default", build({ prompt: "Short prompt for {site}" }).includes("Short prompt for example.com"));
 check("no em or en dashes in the template text", !/[\u2013\u2014]/.test(brief));
+
+env.crawlerInlinks = { "https://example.com/p1/": link("https://example.com/p0/") };
+check("a crawl that reached every link says it is complete",
+  build({}).includes("- Coverage: complete.") && build({}).includes("(possible orphans) (2): https://example.com/lost/, https://example.com/linked-in-sitemap"));
+env.crawlerInlinks = {};
+check("no link map, no coverage claim", !build({}).includes("- Coverage:"));
 
 env.crawlerResults = [];
 env.window.crawlerReports = {};

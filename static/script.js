@@ -41,6 +41,18 @@ function _scLookupInlinks(url) {
       || crawlerInlinks[url + '/']
       || [];
 }
+
+// A row with redirect_url is normally the page the redirect landed on: the
+// crawler follows redirects and stores the row under the landing URL (the
+// start page, when example.com redirects to www). Only a row whose own URL is
+// not where it ended up stands for the redirect source. Same test as
+// _is_redirect_source in app.py.
+function _scIsRedirectSource(r) {
+  if (!r || !r.redirect_url) return false;
+  const n = (u) => String(u || '').trim().toLowerCase()
+    .replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/(%20|\s|\/)+$/, '');
+  return n(r.redirect_url) !== n(r.url);
+}
 let activeCategory = 'all';
 
 // Per-category metadata: severity, explanation, cited sources.
@@ -672,7 +684,10 @@ function renderDock() {
           const _rs = _scRedirectStatus(page);
           const _m = _scRedirectStatusMeta(_rs);
           const _pill = _rs ? `<span style="background:${_m.color};color:#fff;padding:0 6px;border-radius:8px;font-size:10.5px;font-weight:700;margin-right:5px;" title="${_m.name}">${_rs}</span>` : '';
-          return `<dt>Redirects to</dt><dd>${_pill}${escapeHtml(page.redirect_url)} <span style="color:var(--text-muted)">(${page.redirect_hops || 1} hop${(page.redirect_hops||1)>1?'s':''})</span></dd>`;
+          const _hops = `<span style="color:var(--text-muted)">(${page.redirect_hops || 1} hop${(page.redirect_hops||1)>1?'s':''})</span>`;
+          return (!_scIsRedirectSource(page) && page.original_url)
+            ? `<dt>Redirected from</dt><dd>${_pill}${escapeHtml(page.original_url)} ${_hops}</dd>`
+            : `<dt>Redirects to</dt><dd>${_pill}${escapeHtml(page.redirect_url)} ${_hops}</dd>`;
         })() : ''}
       ${(page.redirect_chain && page.redirect_chain.length) ? `<dt>Redirect chain</dt><dd>
         <ol style="margin:0;padding-left:18px;list-style:decimal;">
@@ -897,6 +912,81 @@ function _scIssueGroup(issue) {
   return [stripped, stripped];
 }
 
+// =============================================================================
+// Crawl progress strip under the top bar. A site's size is not known up
+// front, so the bar measures pages crawled against crawled plus still queued,
+// capped at the page limit. Like the desktop crawlers it can step back when
+// one page turns up many new links. Time left is a straight-line estimate
+// from the pace so far and only shows once there is a pace to go on.
+// =============================================================================
+const _scProg = { max: 0, start: 0, host: '', stopped: false, hideT: null };
+
+function _scFmtDuration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  if (m < 60) return `${m}m ${String(sec % 60).padStart(2, '0')}s`;
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+}
+
+function _scProgressSet(pct, state, html) {
+  const box = document.getElementById('crawl-progress');
+  if (!box) return;
+  clearTimeout(_scProg.hideT);
+  box.hidden = false;
+  document.body.classList.add('has-progress');
+  box.dataset.state = state;
+  const bar = box.querySelector('[role="progressbar"]');
+  const text = document.getElementById('crawl-progress-text');
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  document.getElementById('crawl-progress-fill').style.width = `${v}%`;
+  text.innerHTML = html;
+  if (bar) { bar.setAttribute('aria-valuenow', String(v)); bar.setAttribute('aria-valuetext', text.textContent || `${v}%`); }
+}
+
+function _scProgressStart(url, maxPages, resumed) {
+  let host = url;
+  try { host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).host; } catch {}
+  Object.assign(_scProg, { max: maxPages, start: Date.now(), host, stopped: false });
+  _scProgressSet(0, 'running',
+    `<strong>${resumed ? 'Resuming' : 'Starting'} crawl of ${escapeHtml(host)}</strong><span>Waiting for the first page</span>`);
+}
+
+function _scProgressUpdate(crawled, queued) {
+  if (!_scProg.start) return;
+  const total = Math.max(1, Math.min(_scProg.max || Infinity, crawled + queued));
+  const pct = Math.min(100, (crawled / total) * 100);
+  const secs = (Date.now() - _scProg.start) / 1000;
+  const left = crawled >= 5 && total > crawled ? (secs / crawled) * (total - crawled) : null;
+  const atCap = _scProg.max && crawled + queued >= _scProg.max;
+  _scProgressSet(pct, 'running', [
+    `<strong>Crawling ${escapeHtml(_scProg.host)}</strong>`,
+    `<span class="cp-num">${Math.round(pct)}%</span>`,
+    `<span>${crawled.toLocaleString()} of ${total.toLocaleString()} pages${atCap ? ' (page limit)' : ''}</span>`,
+    `<span>${queued.toLocaleString()} queued</span>`,
+    `<span>${_scFmtDuration(secs)} elapsed</span>`,
+    left !== null ? `<span>about ${_scFmtDuration(left)} left</span>` : '',
+  ].join(''));
+}
+
+function _scProgressPaused(fetched, queued, max) {
+  _scProgressSet(100, 'paused',
+    `<strong>Paused at the page limit</strong><span>${Number(fetched).toLocaleString()} of ${Number(max).toLocaleString()} pages crawled, ${Number(queued).toLocaleString()} still queued. Raise the limit or finish in the banner below.</span>`);
+}
+
+function _scProgressDone(n) {
+  if (!_scProg.start) return;
+  const secs = (Date.now() - _scProg.start) / 1000;
+  _scProg.start = 0;
+  _scProgressSet(100, _scProg.stopped ? 'stopped' : 'done',
+    `<strong>${_scProg.stopped ? 'Crawl stopped' : 'Crawl finished'}</strong><span>${n.toLocaleString()} page${n === 1 ? '' : 's'} in ${_scFmtDuration(secs)}</span>`);
+  _scProg.hideT = setTimeout(() => {
+    const box = document.getElementById('crawl-progress');
+    if (box) box.hidden = true;
+    document.body.classList.remove('has-progress');
+  }, 6000);
+}
+
 function startCrawl(opts) {
   opts = opts || {};
   const resumeFromId = opts.resumeFromId || null;
@@ -912,7 +1002,9 @@ function startCrawl(opts) {
     _scResetPerCrawlState();
   }
   if (typeof crawlerDismissErrorBanner === 'function') crawlerDismissErrorBanner();
-  if (!resumeFromId) activeCategory = 'all';
+  // A new crawl opens on the Summary, which fills in live as pages arrive;
+  // the raw page table is one click away under All pages.
+  if (!resumeFromId) activeCategory = '__summary';
 
   document.getElementById('crawler-start-btn').style.display = 'none';
   document.getElementById('crawler-stop-btn').style.display = '';
@@ -923,28 +1015,26 @@ function startCrawl(opts) {
   // Mirror to the new topbar buttons (global, not per-view).
   { const _t = document.getElementById('topbar-export-sitemap'); if (_t) _t.style.display = 'none'; }
   { const _t = document.getElementById('topbar-export-xlsx'); if (_t) _t.style.display = 'none'; }
-  { const _t = document.getElementById('topbar-export-ai'); if (_t) _t.style.display = 'none'; }
   { const _vBtn = document.getElementById('crawler-export-view-btn'); if (_vBtn) _vBtn.style.display = 'none'; }
   if (!resumeFromId) {
     document.getElementById('crawler-tbody').innerHTML = '';
     document.getElementById('crawler-cms-banner').innerHTML = '';
     document.getElementById('issue-info-box').style.display = 'none';
     document.getElementById('issue-info-box').innerHTML = '';
-    document.getElementById('detail-title-text').textContent = 'All Pages';
     document.getElementById('cs-crawled').textContent = '0';
     document.getElementById('cs-queued').textContent = '0';
     document.getElementById('cs-errors').textContent = '0';
-    // Reset active pill highlights
-    document.querySelectorAll('.ci-cat').forEach(el => el.classList.toggle('active', el.dataset.cat === 'all'));
-    document.querySelectorAll('.sev-cell').forEach(el => el.classList.remove('active'));
     updateCounts();
     closeDock();
   }
+  _scProgressStart(url, parseInt(document.getElementById('crawler-max').value) || 500, !!resumeFromId);
 
   crawlerTimer = setInterval(() => {
     const s = Math.floor((Date.now() - crawlerStart) / 1000);
     document.getElementById('cs-elapsed').textContent = s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
   }, 1000);
+  // After the timer exists, so the empty Summary says the crawl is starting.
+  if (!resumeFromId && typeof selectCategory === 'function') selectCategory('__summary');
 
   const reqBody = {
     url,
@@ -1002,6 +1092,7 @@ function startCrawl(opts) {
               document.getElementById('cs-crawled').textContent = p.crawled;
               document.getElementById('cs-queued').textContent = p.queued;
               document.getElementById('cs-errors').textContent = p.errors;
+              _scProgressUpdate(p.crawled, p.queued);
               if (p.queue_sample !== undefined) {
                 crawlerUpdateQueuePanel(p.queue_sample, p.queued);
               }
@@ -1010,9 +1101,13 @@ function startCrawl(opts) {
               // so users see counts climb in real time as the crawl runs.
               // Throttled to ~1 render/sec via a simple debounce so we
               // don't burn cycles on big crawls.
-              if (activeCategory === '__summary') {
-                clearTimeout(window._scSummaryRerenderT);
+              // A throttle, not a debounce: resetting the timer on every page
+              // meant a busy crawl never redrew until it paused.
+              if (activeCategory === '__summary' && crawlerResults.length === 1 && typeof _scRenderSummaryPanel === 'function') {
+                _scRenderSummaryPanel();
+              } else if (activeCategory === '__summary' && !window._scSummaryRerenderT) {
                 window._scSummaryRerenderT = setTimeout(() => {
+                  window._scSummaryRerenderT = null;
                   if (activeCategory === '__summary' && typeof _scRenderSummaryPanel === 'function') _scRenderSummaryPanel();
                 }, 800);
               }
@@ -1047,9 +1142,12 @@ function startCrawl(opts) {
               showToast(`Resumed: picking up ${p.previous_pages} pages, ${p.queued} URLs still in queue`, 'info');
             } else if (p.type === 'limit_reached') {
               crawlerShowLimitBanner(p.fetched, p.queued, p.current_max);
+              _scProgressPaused(p.fetched, p.queued, p.current_max);
               crawlerUpdateQueuePanel(p.queue_sample, p.queued);
             } else if (p.type === 'crawl_resumed') {
               crawlerHideLimitBanner();
+              _scProg.max = p.new_max || _scProg.max;
+              _scProgressUpdate(crawlerResults.length, 0);
               showToast(`Crawl resumed: page cap raised to ${p.new_max}`, 'info');
             } else if (p.type === 'complete') {
               crawlerLastCrawlId = null;  // crawl finished naturally
@@ -1497,7 +1595,7 @@ window.selectCategory = function(cat) {
     'Paginated page set to noindex': 'Paginated Pages Set to Noindex',
     'Paginated page canonicalised to another URL': 'Paginated Pages Canonicalised Away',
     '__sm_missing': 'Missing from Sitemap', '__sm_orphan': 'Orphan in Sitemap',
-    '__sm_only': 'Orphan Pages: No Internal Links', '__sm_noindex': 'Non-Indexable in Sitemap',
+    '__sm_only': 'In Sitemap, Not Crawled', '__sm_noindex': 'Non-Indexable in Sitemap',
     '__sm_non200': 'Non-200 in Sitemap', '__sm_redirects': 'Redirects in Sitemap',
     '__sm_pagination': 'Pagination in Sitemap',
     '__nd_content': 'Near-Duplicate Content: pairs above the similarity threshold',
@@ -2384,7 +2482,7 @@ function _scRenderAllValuesPanel(cat) {
   const filtered = crawlerResults.filter(r => {
     if (r.is_pagination) return false;
     if (r.indexable === false) return false;
-    if (r.redirect_url) return false;
+    if (_scIsRedirectSource(r)) return false;
     if (r.status_code && (r.status_code < 200 || r.status_code >= 300)) return false;
     return true;
   });
@@ -2529,7 +2627,7 @@ function _scRenderDuplicatesPanel(cat) {
     for (const r of crawlerResults) {
       if (r.is_pagination) continue;
       if (r.indexable === false) continue;                       // noindex — out of scope per user request
-      if (r.redirect_url) continue;                              // redirected — not unique content
+      if (_scIsRedirectSource(r)) continue;                      // a redirect, not a page
       if (r.status_code && r.status_code >= 300) continue;       // non-200 — not indexable
       const canon = (r.canonical || '').trim();
       const url = r.url || '';
@@ -2869,7 +2967,9 @@ function _scRenderSummaryPanel() {
 
   const pages = crawlerResults || [];
   if (!pages.length) {
-    panel.innerHTML = `<div style="padding:60px 20px;text-align:center;color:var(--text-muted);">No crawl loaded.</div>`;
+    panel.innerHTML = `<div style="padding:60px 20px;text-align:center;color:var(--text-muted);">${crawlerTimer
+      ? 'Crawl starting. This summary fills in as pages arrive.'
+      : 'No crawl loaded.'}</div>`;
     main.appendChild(panel);
     return;
   }
@@ -3491,7 +3591,7 @@ function _renderSitemapPanel(cat) {
   const map = {
     '__sm_missing':    { key: 'missing_from_sitemap',     hint: 'These pages are indexable, return 200, and were reached by the crawl, but are NOT in the sitemap. Add them.' },
     '__sm_orphan':     { key: 'orphan_in_sitemap',        hint: 'In the sitemap and crawled, but no internal links point to them. Link to them from related pages.' },
-    '__sm_only':       { key: 'sitemap_only',             label: 'Orphan Pages',  hint: 'These pages are in your sitemap but no internal links point to them anywhere on the site. Visitors and Google\'s crawler can\'t reach them by clicking through. For each one, decide: <b>(1)</b> Not needed? Add <code>noindex</code> or delete the page (and remove from sitemap). <b>(2)</b> Needed? Add an internal link from a relevant page, or include it in your header/footer navigation.' },
+    '__sm_only':       { key: 'sitemap_only',             label: 'In sitemap, not crawled', hint: 'These URLs are in your sitemap but this crawl did not fetch them. Check the details column: <b>linked from crawled pages</b> means the crawl stopped before reaching them (page or depth limit, include or exclude rules, robots.txt), so raise the limit and crawl again. <b>No link from crawled pages</b> means they may be orphans, which only a crawl that finished without hitting a limit can confirm. For a real orphan, either link to it from a relevant page or, if it is not needed, remove it from the sitemap.' },
     '__sm_noindex':    { key: 'non_indexable_in_sitemap', hint: 'In sitemap but flagged noindex. Remove from sitemap OR remove the noindex.' },
     '__sm_non200':     { key: 'non_200_in_sitemap',       hint: 'In sitemap but the URL returns 4xx/5xx. Remove from sitemap or fix the page.' },
     '__sm_redirects':  { key: 'redirects_in_sitemap',     hint: 'Replace with the canonical destination URL: having a 301/302 in the sitemap wastes crawl budget.' },
@@ -3524,6 +3624,9 @@ function _renderSitemapPanel(cat) {
       it.status_code  ? `${it.status_code}` : '',
       it.redirects_to ? `→ ${it.redirects_to}` : '',
       it.reason       ? it.reason : '',
+      typeof it.linked_from === 'number'
+        ? (it.linked_from ? `linked from ${it.linked_from} crawled page${it.linked_from === 1 ? '' : 's'}` : 'no link from crawled pages')
+        : '',
     ].filter(Boolean).join(' · ');
     return { url: u, meta };
   });
@@ -3640,7 +3743,7 @@ function updateCounts() {
   const _pages = (crawlerResults || []).filter(r => {
     if (r.is_pagination) return false;
     if (r.indexable === false) return false;
-    if (r.redirect_url) return false;
+    if (_scIsRedirectSource(r)) return false;
     if (r.status_code && (r.status_code < 200 || r.status_code >= 300)) return false;
     return true;
   });
@@ -3671,7 +3774,7 @@ function updateCounts() {
     const m = new Map();  // value -> Set(normalised URLs)
     for (const r of _pages) {
       if (r.indexable === false) continue;
-      if (r.redirect_url) continue;
+      if (_scIsRedirectSource(r)) continue;
       if (r.status_code && r.status_code >= 300) continue;
       const canon = (r.canonical || '').trim();
       const url = r.url || '';
@@ -3843,6 +3946,7 @@ function _sortIssueSidebar() {
 }
 
 function stopCrawl() {
+  _scProg.stopped = true;
   if (crawlerAbort) crawlerAbort.abort();
 }
 
@@ -4207,7 +4311,7 @@ function _crawlerExportViewLabel(cat, n) {
     '__external_links':`Export view (${n} external link${n===1?'':'s'})`,
     '__sm_missing':    `Export view (${n} missing-from-sitemap)`,
     '__sm_orphan':     `Export view (${n} orphan-in-sitemap)`,
-    '__sm_only':       `Export view (${n} sitemap-only orphan${n===1?'':'s'})`,
+    '__sm_only':       `Export view (${n} sitemap URL${n===1?'':'s'} not crawled)`,
     '__sm_noindex':    `Export view (${n} noindex in sitemap)`,
     '__sm_non200':     `Export view (${n} non-200 in sitemap)`,
     '__sm_redirects':  `Export view (${n} redirect${n===1?'':'s'} in sitemap)`,
@@ -4320,7 +4424,7 @@ async function exportCrawlerXlsx() {
       const smCats = [
         ['__sm_missing',    'Missing from sitemap'],
         ['__sm_orphan',     'Orphan in sitemap'],
-        ['__sm_only',       'Sitemap-only orphan'],
+        ['__sm_only',       'In sitemap, not crawled'],
         ['__sm_noindex',    'Noindex in sitemap'],
         ['__sm_non200',     'Non-200 in sitemap'],
         ['__sm_redirects',  'Redirect in sitemap'],
@@ -4383,7 +4487,7 @@ async function exportCrawlerSitemap() {
   const eligible = crawlerResults.filter(r => {
     if (r.status_code !== 200) return false;
     if (r.error) return false;
-    if (r.redirect_url) return false;
+    if (_scIsRedirectSource(r)) return false;
     if (r.indexable === false) return false;
     if (r.canonical_kind === 'canonicalised') return false;
     if (r.is_pagination) return false;
@@ -4452,11 +4556,20 @@ function _scAiPrompt() {
   try { return localStorage.getItem(_SC_AI_PROMPT_KEY) || _SC_AI_DEFAULT_PROMPT; } catch { return _SC_AI_DEFAULT_PROMPT; }
 }
 
-// Keep a cell on one line and out of the table syntax.
+// The user's own calendar date. toISOString() is UTC, which put an evening
+// crawl in Australia on the day before.
+function _scLocalDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Keep a cell on one line and out of the table syntax. Pipes are escaped, not
+// swapped for another character: "Title | Brand" has to reach the assistant
+// as written or its suggested titles copy the wrong separator.
 function _scMdCell(v, max) {
-  let s = String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '/').trim();
+  let s = String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim();
   if (max && s.length > max) s = s.slice(0, max - 1) + '…';
-  return s;
+  return s.replace(/\|/g, '\\|');
 }
 
 function _scBuildAiBrief(opts) {
@@ -4480,16 +4593,42 @@ function _scBuildAiBrief(opts) {
   const times = rows.map(r => Number(r.response_time) || 0);
   const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
   const maxDepth = rows.reduce((m, r) => Math.max(m, r.depth || 0), 0);
+
+  // Coverage. Internal URLs that crawled pages link to but the crawl never
+  // fetched mean it stopped early (page or depth limit) or skipped them by
+  // rule. Without saying so, an assistant reads every sitemap URL the crawl
+  // missed as an orphan.
+  const inlinks = (typeof crawlerInlinks !== 'undefined' && crawlerInlinks) ? crawlerInlinks : {};
+  const urlKey = (u) => String(u || '').replace(/\/+$/, '');
+  const fetched = new Set();
+  for (const r of rows) { fetched.add(urlKey(r.url)); if (r.original_url) fetched.add(urlKey(r.original_url)); }
+  const NON_HTML = /\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff|avif|pdf|docx?|xlsx?|pptx?|csv|txt|rtf|zip|tar|gz|7z|rar|mp4|mov|webm|m4v|avi|mkv|mp3|wav|ogg|flac|css|js|json|xml|map|woff2?|ttf|otf|eot)$/i;
+  const linkedKeys = new Set(Object.keys(inlinks).filter(u => (inlinks[u] || []).length).map(urlKey));
+  const unfetched = Object.keys(inlinks).filter(u => (inlinks[u] || []).length && !fetched.has(urlKey(u))
+                                                     && !NON_HTML.test(String(u).split(/[?#]/)[0]));
+  const start = rows.find(r => !(r.depth || 0));
+  const list5 = (urls) => `${urls.slice(0, 5).join(', ')}${urls.length > 5 ? `, and ${urls.length - 5} more` : ''}`;
+
   add('## Crawl overview', '',
     `- Site: ${site}`,
-    `- Exported: ${new Date().toISOString().slice(0, 10)}`,
-    `- Pages crawled: ${rows.length}`,
-    `- Indexable pages returning 200: ${indexable}`,
+    `- Exported: ${_scLocalDate()}`);
+  if (start) {
+    const from = start.original_url && urlKey(start.original_url) !== urlKey(start.url) ? start.original_url : '';
+    add(from ? `- Start URL: ${from} (redirects to ${start.url})` : `- Start URL: ${start.url}`);
+  }
+  add(`- Pages crawled: ${rows.length}`);
+  if (Object.keys(inlinks).length) {
+    add(unfetched.length
+      ? `- Coverage: partial. ${unfetched.length} internal URL${unfetched.length === 1 ? ' is' : 's are'} linked from crawled pages but ${unfetched.length === 1 ? 'was' : 'were'} not crawled (page or depth limit, include or exclude rules, or robots.txt). Findings cover the crawled pages only, so a URL missing from this crawl is not evidence that nothing links to it. Examples: ${list5(unfetched)}`
+      : '- Coverage: complete. Every internal page link found on the crawled pages was crawled.');
+  }
+  add(`- Indexable pages returning 200: ${indexable}`,
     `- Status codes: ${Object.keys(codes).sort((a, b) => a - b).map(c => `${c || 'no response'} (${codes[c]})`).join(', ')}`,
     `- Average response time: ${avg.toFixed(2)} s`,
     `- Deepest page: ${maxDepth} click${maxDepth === 1 ? '' : 's'} from the start URL`, '');
 
   // Issues, grouped and ranked the way the Summary shows them.
+  const REDIRECT_ISSUE = /^(Redirect|HTTP→HTTPS redirect|www normalization redirect|Trailing slash redirect) \(/;
   const groups = new Map();
   for (const r of rows) {
     for (const issue of (r.issues || [])) {
@@ -4498,7 +4637,12 @@ function _scBuildAiBrief(opts) {
       if (!g) { g = { sev: sevOf(issue), pages: new Map() }; groups.set(label, g); }
       // Keep the raw text only when it carries detail (a count, a value, a
       // target); a bare restatement of the heading is noise.
-      const detail = issue !== label && /[(\d:]/.test(issue) ? issue : '';
+      let detail = issue !== label && /[(\d:]/.test(issue) ? issue : '';
+      // A followed redirect is stored under the page it landed on, so say
+      // where it came from or the landing page reads as the redirect.
+      if (REDIRECT_ISSUE.test(issue) && r.original_url && urlKey(r.original_url) !== urlKey(r.url)) {
+        detail = `${issue} from ${r.original_url}${r.redirect_status ? ` (${r.redirect_status})` : ''}`;
+      }
       if (!g.pages.has(r.url)) g.pages.set(r.url, detail);
     }
   }
@@ -4510,12 +4654,23 @@ function _scBuildAiBrief(opts) {
     for (const [label, g] of list) {
       const n = g.pages.size;
       add(`### ${_scMdCell(label)} (${n} page${n === 1 ? '' : 's'})`);
-      let i = 0;
-      for (const [url, detail] of g.pages) {
-        if (i++ >= maxUrls) break;
-        add(`- ${url}${detail ? `: ${_scMdCell(detail, 160)}` : ''}`);
+      // An issue on nearly every page is shorter, and complete, as the few
+      // pages without it; a capped list leaves the assistant guessing.
+      const spared = rows.filter(r => !g.pages.has(r.url)).map(r => r.url);
+      if (n > maxUrls && spared.length <= maxUrls) {
+        add(spared.length ? `- Every crawled page except: ${spared.join(', ')}` : '- Every crawled page');
+        const details = [...g.pages].filter(([, d]) => d);
+        if (new Set(details.map(([, d]) => d)).size > 1) {
+          details.slice(0, 3).forEach(([url, d]) => add(`- For example ${url}: ${_scMdCell(d, 160)}`));
+        }
+      } else {
+        let i = 0;
+        for (const [url, detail] of g.pages) {
+          if (i++ >= maxUrls) break;
+          add(`- ${url}${detail ? `: ${_scMdCell(detail, 160)}` : ''}`);
+        }
+        if (n > maxUrls) add(`- and ${n - maxUrls} more`);
       }
-      if (n > maxUrls) add(`- and ${n - maxUrls} more`);
       add('');
     }
   }
@@ -4556,17 +4711,21 @@ function _scBuildAiBrief(opts) {
     add('## Sitemap analysis', '',
       `- Sitemaps found: ${(sm.sitemaps_found || []).map(s => s.url).join(', ') || 'none'}`,
       `- URLs in sitemap: ${t.urls_in_sitemap || 0}; URLs crawled: ${t.urls_in_crawl || 0}`);
-    const smList = [['missing_from_sitemap', 'Crawled and indexable but missing from the sitemap'],
-                    ['sitemap_only', 'In the sitemap but not reached by any internal link'],
-                    ['non_200_in_sitemap', 'In the sitemap but not returning 200'],
-                    ['redirects_in_sitemap', 'Redirecting URLs in the sitemap'],
-                    ['non_indexable_in_sitemap', 'Noindex URLs in the sitemap']];
-    for (const [key, label] of smList) {
-      const items = sm.reports[key] || [];
-      if (!items.length) continue;
-      const urls = items.map(it => (typeof it === 'string' ? it : it.url));
-      add(`- ${label} (${urls.length}): ${urls.slice(0, 5).join(', ')}${urls.length > 5 ? `, and ${urls.length - 5} more` : ''}`);
-    }
+    const smUrls = (key) => (sm.reports[key] || []).map(it => (typeof it === 'string' ? it : it.url));
+    const smLine = (label, urls) => { if (urls.length) add(`- ${label} (${urls.length}): ${list5(urls)}`); };
+    smLine('Crawled and indexable but missing from the sitemap', smUrls('missing_from_sitemap'));
+    // "In the sitemap, not crawled" is two different findings: a URL the
+    // crawled pages link to was only out of reach (limit or rule); one nothing
+    // links to is a possible orphan, and only a complete crawl proves it.
+    const notCrawled = smUrls('sitemap_only');
+    smLine('In the sitemap and linked from crawled pages, but not crawled', notCrawled.filter(u => linkedKeys.has(urlKey(u))));
+    smLine(unfetched.length
+      ? 'In the sitemap and not linked from any crawled page (possible orphans; the crawl was partial, so pages it did not reach may link to them)'
+      : 'In the sitemap and not linked from any crawled page (possible orphans)',
+      notCrawled.filter(u => !linkedKeys.has(urlKey(u))));
+    smLine('In the sitemap but not returning 200', smUrls('non_200_in_sitemap'));
+    smLine('Redirecting URLs in the sitemap', smUrls('redirects_in_sitemap'));
+    smLine('Noindex URLs in the sitemap', smUrls('non_indexable_in_sitemap'));
     (sm.warnings || []).forEach(w => add(`- Note: ${_scMdCell(w, 200)}`));
     add('');
   }
@@ -4615,7 +4774,7 @@ function _scBuildAiBrief(opts) {
 function _scAiBriefFilename() {
   let host = '';
   try { host = new URL((crawlerResults[0] || {}).url).host.replace(/:/g, '-'); } catch {}
-  return ['ai-brief', host, new Date().toISOString().slice(0, 10)].filter(Boolean).join('-') + '.md';
+  return ['ai-brief', host, _scLocalDate()].filter(Boolean).join('-') + '.md';
 }
 
 function _scAiRefreshStats() {
@@ -4628,11 +4787,11 @@ function _scAiRefreshStats() {
     + (tokens > 30000 ? ' That is large for some chat windows: untick the page table to shrink it.' : '');
 }
 
-function openAiExport() {
-  if (!Array.isArray(crawlerResults) || !crawlerResults.length) {
-    showToast('Run or load a crawl first.', 'info');
-    return;
-  }
+// "Use with AI": two ways in. Paste a brief of this crawl into any AI chat,
+// or connect an AI app so it runs crawls and reads results itself over MCP.
+// The second needs no crawl, so the button shows from the start.
+function openAiExport(tab) {
+  const hasCrawl = Array.isArray(crawlerResults) && crawlerResults.length > 0;
   let modal = document.getElementById('ai-export-modal');
   if (!modal) {
     modal = document.createElement('div');
@@ -4641,22 +4800,63 @@ function openAiExport() {
     modal.innerHTML = `
       <div class="ai-modal-card" role="dialog" aria-modal="true" aria-labelledby="ai-export-title">
         <div class="ai-modal-head">
-          <h2 id="ai-export-title">AI brief</h2>
+          <h2 id="ai-export-title">Use with AI</h2>
           <button type="button" class="ai-close" onclick="closeAiExport()" aria-label="Close">×</button>
         </div>
-        <p class="ai-lede">A compact summary of this crawl with a prompt on top. Paste it into any AI assistant to get a ranked list of fixes. The crawler sends nothing anywhere: the text goes only where you paste it.</p>
-        <label class="ai-label" for="ai-export-prompt">Prompt</label>
-        <textarea id="ai-export-prompt" rows="9" spellcheck="false"></textarea>
-        <label class="ai-check"><input type="checkbox" id="ai-export-pages" checked> Include a page table (up to 200 pages, most issues first)</label>
-        <div id="ai-export-stats" class="ai-stats"></div>
-        <div class="ai-actions">
-          <button type="button" class="ai-btn ai-primary" id="ai-export-copy" onclick="copyAiBrief()">Copy to clipboard</button>
-          <button type="button" class="ai-btn" id="ai-export-download" onclick="downloadAiBrief()">Download .md</button>
-          <button type="button" class="ai-link" onclick="resetAiPrompt()">Reset prompt</button>
+        <div class="ai-tabs" role="tablist" aria-label="Ways to use this crawler with AI">
+          <button type="button" role="tab" class="ai-tab" id="ai-tab-brief" aria-controls="ai-pane-brief" onclick="aiExportTab('brief')">Paste a brief</button>
+          <button type="button" role="tab" class="ai-tab" id="ai-tab-connect" aria-controls="ai-pane-connect" onclick="aiExportTab('connect')">Connect an AI app</button>
         </div>
+        <section id="ai-pane-brief" role="tabpanel" aria-labelledby="ai-tab-brief" class="ai-pane">
+          <p class="ai-lede">A summary of this crawl with a prompt on top. Paste it into any AI chat to get a ranked list of fixes. The crawler sends nothing anywhere: the text goes only where you paste it.</p>
+          <div id="ai-brief-empty" class="ai-empty" hidden>Run or load a crawl first, then come back here for its brief. To let an AI app start crawls itself, use <button type="button" class="ai-link" onclick="aiExportTab('connect')">Connect an AI app</button>.</div>
+          <div id="ai-brief-form">
+            <label class="ai-label" for="ai-export-prompt">Prompt</label>
+            <textarea id="ai-export-prompt" rows="9" spellcheck="false"></textarea>
+            <label class="ai-check"><input type="checkbox" id="ai-export-pages" checked> Include a page table (up to 200 pages, most issues first)</label>
+            <div id="ai-export-stats" class="ai-stats"></div>
+            <div class="ai-actions">
+              <button type="button" class="ai-btn ai-primary" id="ai-export-copy" onclick="copyAiBrief()">Copy brief</button>
+              <button type="button" class="ai-btn" id="ai-export-download" onclick="downloadAiBrief()">Download .md</button>
+              <button type="button" class="ai-link" onclick="resetAiPrompt()">Reset prompt</button>
+            </div>
+          </div>
+        </section>
+        <section id="ai-pane-connect" role="tabpanel" aria-labelledby="ai-tab-connect" class="ai-pane" hidden>
+          <p class="ai-lede">Let an AI app start crawls and read the results itself, through MCP. The app runs a small server on this computer that talks to this crawler; nothing goes anywhere else.</p>
+          <div id="ai-mcp-warn" class="ai-warn" hidden></div>
+          <div class="ai-step">
+            <h3 class="ai-step-title"><span class="ai-step-n">1</span>Paste this into your AI app</h3>
+            <p class="ai-hint">For AI apps that can run commands on this computer. The app adds the server with its own command, checks the connection and tells you if it needs a restart.</p>
+            <textarea id="ai-mcp-prompt" rows="9" readonly spellcheck="false"></textarea>
+            <div class="ai-actions">
+              <button type="button" class="ai-btn ai-primary" id="ai-mcp-copy" onclick="aiCopyField('ai-mcp-prompt', 'Setup prompt copied. Paste it into your AI app.')">Copy setup prompt</button>
+            </div>
+          </div>
+          <div class="ai-step">
+            <h3 class="ai-step-title"><span class="ai-step-n">2</span>Then ask it something</h3>
+            <div class="ai-code-row"><code id="ai-mcp-ask" class="ai-code"></code><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-ask', 'Copied.')">Copy</button></div>
+          </div>
+          <details class="ai-manual">
+            <summary>Set it up by hand instead</summary>
+            <label class="ai-label">Command</label>
+            <div class="ai-code-row"><code id="ai-mcp-cmd" class="ai-code"></code><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-cmd', 'Command copied.')">Copy</button></div>
+            <label class="ai-label">For apps with an "mcp add" command (put the app's name first)</label>
+            <div class="ai-code-row"><code id="ai-mcp-add" class="ai-code"></code><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-add', 'Command copied.')">Copy</button></div>
+            <label class="ai-label">For apps with a JSON settings file (mcpServers)</label>
+            <div class="ai-code-row"><pre id="ai-mcp-json" class="ai-code"></pre><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-json', 'Settings block copied.')">Copy</button></div>
+            <p class="ai-hint" id="ai-mcp-links"></p>
+          </details>
+        </section>
       </div>`;
     document.body.appendChild(modal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeAiExport(); });
+    modal.querySelector('.ai-tabs').addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const next = document.getElementById('ai-tab-brief').getAttribute('aria-selected') === 'true' ? 'connect' : 'brief';
+      aiExportTab(next);
+      document.getElementById(`ai-tab-${next}`).focus();
+    });
     document.getElementById('ai-export-prompt').addEventListener('input', (e) => {
       try { localStorage.setItem(_SC_AI_PROMPT_KEY, e.target.value); } catch {}
       _scAiRefreshStats();
@@ -4666,10 +4866,89 @@ function openAiExport() {
       if (e.key === 'Escape' && !modal.hidden) closeAiExport();
     });
   }
-  document.getElementById('ai-export-prompt').value = _scAiPrompt();
+  document.getElementById('ai-brief-empty').hidden = hasCrawl;
+  document.getElementById('ai-brief-form').hidden = !hasCrawl;
+  if (hasCrawl) document.getElementById('ai-export-prompt').value = _scAiPrompt();
   modal.hidden = false;
-  _scAiRefreshStats();
-  document.getElementById('ai-export-copy').focus();
+  aiExportTab(tab || (hasCrawl ? 'brief' : 'connect'));
+}
+
+function aiExportTab(which) {
+  for (const t of ['brief', 'connect']) {
+    const on = t === which;
+    const btn = document.getElementById(`ai-tab-${t}`);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    btn.tabIndex = on ? 0 : -1;
+    document.getElementById(`ai-pane-${t}`).hidden = !on;
+  }
+  if (which === 'brief') {
+    if (Array.isArray(crawlerResults) && crawlerResults.length) {
+      _scAiRefreshStats();
+      document.getElementById('ai-export-copy').focus();
+    }
+  } else {
+    _scAiLoadMcpSetup();
+  }
+}
+
+// Fills the connect tab from /mcp-setup: the command, paths and settings for
+// this machine, so nothing has to be looked up or typed.
+function _scAiLoadMcpSetup() {
+  const promptEl = document.getElementById('ai-mcp-prompt');
+  let site = '';
+  try { site = new URL((crawlerResults[0] || {}).url).host; } catch {}
+  document.getElementById('ai-mcp-ask').textContent = site
+    ? `Open my latest Open SEO Crawler crawl of ${site} and list the 10 fixes that matter most.`
+    : 'Crawl https://example.com with Open SEO Crawler and list the 10 fixes that matter most.';
+  if (promptEl.dataset.loaded) return;
+  promptEl.value = 'Loading the settings for this computer...';
+  fetch('/mcp-setup').then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))).then(info => {
+    const q = (a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a);
+    const cmd = [info.command, ...(info.args || [])].map(q).join(' ');
+    const env = Object.entries(info.env || {});
+    const entry = { command: info.command, args: info.args || [] };
+    if (env.length) entry.env = info.env;
+    const json = JSON.stringify({ mcpServers: { [info.name]: entry } }, null, 2);
+    promptEl.value = [
+      'Connect the Open SEO Crawler MCP server to this app, on this computer.',
+      '',
+      `Server name: ${info.name}`,
+      'Type: local stdio server',
+      `Command: ${info.command}`,
+      `Arguments: ${(info.args || []).join(' ')}`,
+      ...(env.length ? [`Environment: ${env.map(([k, v]) => `${k}=${v}`).join(' ')}`] : []),
+      '',
+      '1. Add it with your own command or settings for MCP servers, for my user rather than one project, so it works in every folder. If you use a JSON settings file, this is the entry:',
+      json,
+      `2. Check that it connects, for example by calling its list_crawls tool. The crawler has to be running at ${info.crawler_url}.`,
+      '3. If the new tools only appear after a restart or reload, tell me exactly what to do.',
+      '',
+      'Add only this server. Do not install packages or change other settings.',
+    ].join('\n');
+    promptEl.dataset.loaded = '1';
+    document.getElementById('ai-mcp-cmd').textContent = (env.length ? env.map(([k, v]) => `${k}=${v} `).join('') : '') + cmd;
+    document.getElementById('ai-mcp-add').textContent = `mcp add ${info.name} -- ${cmd}`;
+    document.getElementById('ai-mcp-json').textContent = json;
+    const links = [];
+    if (info.bundle_url) links.push(`Desktop apps that install .mcpb bundles: <a href="${safeHref(info.bundle_url)}" target="_blank" rel="noopener">download the one-click bundle</a>.`);
+    links.push('<a href="https://github.com/puneetindersingh/open-seo-crawler#connect-an-ai-app" target="_blank" rel="noopener">Steps for each AI app</a> are in the README.');
+    document.getElementById('ai-mcp-links').innerHTML = links.join(' ');
+    const warn = [];
+    if (!info.same_machine) warn.push('This page is open from another computer. The AI app has to run on the computer where the crawler is installed.');
+    if (!info.server_exists) warn.push('mcp_server.py is missing from this install. Update the crawler first.');
+    const w = document.getElementById('ai-mcp-warn');
+    w.textContent = warn.join(' ');
+    w.hidden = !warn.length;
+  }).catch(e => {
+    promptEl.value = `Could not read the settings from the crawler (${e.message}). Run "python3 osc.py setup" in the crawler folder instead.`;
+  });
+}
+
+function aiCopyField(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  _scCopyText('value' in el && el.tagName === 'TEXTAREA' ? el.value : el.textContent, () => showToast(msg, 'success'),
+              'Copy was blocked by the browser. Select the text and copy it by hand.');
 }
 
 function closeAiExport() {
@@ -4690,17 +4969,21 @@ function _scCurrentAiBrief() {
 
 function copyAiBrief() {
   const text = _scCurrentAiBrief();
-  const done = () => showToast(`Copied ${text.length.toLocaleString()} characters. Paste them into your AI assistant.`, 'success');
-  // navigator.clipboard only exists on secure origins; a teammate opening the
-  // app by its LAN address over http gets the textarea fallback.
+  _scCopyText(text, () => showToast(`Copied ${text.length.toLocaleString()} characters. Paste them into your AI chat.`, 'success'),
+              'Copy was blocked by the browser. Use Download .md instead.');
+}
+
+// navigator.clipboard only exists on secure origins; a teammate opening the
+// app by its LAN address over http gets the textarea fallback.
+function _scCopyText(text, done, failMsg) {
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(done, () => _scCopyFallback(text, done));
+    navigator.clipboard.writeText(text).then(done, () => _scCopyFallback(text, done, failMsg));
   } else {
-    _scCopyFallback(text, done);
+    _scCopyFallback(text, done, failMsg);
   }
 }
 
-function _scCopyFallback(text, done) {
+function _scCopyFallback(text, done, failMsg) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
@@ -4710,7 +4993,7 @@ function _scCopyFallback(text, done) {
   try { ok = document.execCommand('copy'); } catch {}
   ta.remove();
   if (ok) done();
-  else showToast('Copy was blocked by the browser. Use Download .md instead.', 'error');
+  else showToast(failMsg || 'Copy was blocked by the browser.', 'error');
 }
 
 function downloadAiBrief() {
@@ -4956,6 +5239,7 @@ function _scRenderBotsPanel() {
 
 function crawlFinished() {
   if (crawlerTimer) { clearInterval(crawlerTimer); crawlerTimer = null; }
+  _scProgressDone((crawlerResults || []).length);
   document.getElementById('crawler-start-btn').style.display = '';
   document.getElementById('crawler-stop-btn').style.display = 'none';
   const applyBtn = document.getElementById('crawler-apply-rules');
@@ -4972,8 +5256,6 @@ function crawlFinished() {
     if (_t1) _t1.style.display = 'inline-flex';
     const _t2 = document.getElementById('topbar-export-xlsx');
     if (_t2) _t2.style.display = 'inline-flex';
-    const _t3 = document.getElementById('topbar-export-ai');
-    if (_t3) _t3.style.display = 'inline-flex';
   }
   // Sitemap analysis is opt-in via the 'Sitemap analysis' checkbox.
   if (Array.isArray(crawlerResults) && crawlerResults.length) {
@@ -5752,7 +6034,6 @@ function loadSavedCrawl(file) {
       if (post) post.style.display = 'flex';
       { const _t = document.getElementById('topbar-export-sitemap'); if (_t && crawlerResults.length) _t.style.display = 'inline-flex'; }
       { const _t = document.getElementById('topbar-export-xlsx'); if (_t && crawlerResults.length) _t.style.display = 'inline-flex'; }
-      { const _t = document.getElementById('topbar-export-ai'); if (_t && crawlerResults.length) _t.style.display = 'inline-flex'; }
       if (typeof updateCounts === 'function') updateCounts();
       // Default to Summary on load so users see what needs fixing
       // immediately, not an opaque 500-row table.

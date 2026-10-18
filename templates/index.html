@@ -47,9 +47,9 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span>.xlsx</span>
     </button>
-    <button id="topbar-export-ai" type="button" onclick="openAiExport()" title="A compact brief of this crawl with a prompt, to paste into any AI assistant" class="topbar-btn" style="display:none;">
+    <button id="topbar-export-ai" type="button" onclick="openAiExport()" title="Paste a brief of this crawl into an AI chat, or connect an AI app to the crawler over MCP" class="topbar-btn">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
-      <span>AI brief</span>
+      <span>Use with AI</span>
     </button>
     <button type="button" class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light / dark theme">
       <svg id="theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -59,6 +59,10 @@
       <span id="theme-toggle-label">Light</span>
     </button>
   </header>
+  <div id="crawl-progress" class="crawl-progress" hidden>
+    <div class="crawl-progress-track" role="progressbar" aria-label="Crawl progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="crawl-progress-fill" id="crawl-progress-fill"></div></div>
+    <div class="crawl-progress-text" id="crawl-progress-text"></div>
+  </div>
   <script>
     // Theme toggle — runs before main script.js to avoid a flash of the
     // wrong theme. Reads localStorage first, falls back to OS preference.
@@ -397,7 +401,7 @@
       <div id="sitemap-status" class="sitemap-status" style="display:none;"></div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_missing"    onclick="selectCategory('__sm_missing')"    id="sm-cat-missing"    style="display:none;"><span title="Indexable, 200 and crawled, but missing from the sitemap">Missing from sitemap</span><span class="ci-count err" data-count="__sm_missing">0</span></div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_orphan"     onclick="selectCategory('__sm_orphan')"     id="sm-cat-orphan"     style="display:none;"><span title="In sitemap, no inbound internal links">Orphan in sitemap</span><span class="ci-count err" data-count="__sm_orphan">0</span></div>
-      <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_only"       onclick="selectCategory('__sm_only')"       id="sm-cat-only"       style="display:none;"><span title="In sitemap but no internal links point to them. Google sees them; internal navigation doesn't">Orphan Pages: no internal links</span><span class="ci-count err" data-count="__sm_only">0</span></div>
+      <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_only"       onclick="selectCategory('__sm_only')"       id="sm-cat-only"       style="display:none;"><span title="In the sitemap, but this crawl did not fetch them: either nothing links to them or the crawl stopped first">In sitemap, not crawled</span><span class="ci-count err" data-count="__sm_only">0</span></div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_noindex"    onclick="selectCategory('__sm_noindex')"    id="sm-cat-noindex"    style="display:none;"><span title="In sitemap but noindex">Non-indexable in sitemap</span><span class="ci-count warn" data-count="__sm_noindex">0</span></div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_non200"     onclick="selectCategory('__sm_non200')"     id="sm-cat-non200"     style="display:none;"><span title="In sitemap but 4xx/5xx">Non-200 in sitemap</span><span class="ci-count err" data-count="__sm_non200">0</span></div>
       <div role="button" tabindex="0" class="ci-cat" data-cat="__sm_redirects"  onclick="selectCategory('__sm_redirects')"  id="sm-cat-redirects"  style="display:none;"><span title="In sitemap but redirects">Redirects in sitemap</span><span class="ci-count warn" data-count="__sm_redirects">0</span></div>

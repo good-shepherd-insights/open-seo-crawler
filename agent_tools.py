@@ -21,6 +21,7 @@ import math
 import os
 import re
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -28,7 +29,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 VERSION = '1.0.0'
@@ -137,6 +138,37 @@ def _sse(resp):
             yield json.loads(payload)
         except ValueError:
             continue
+
+
+def mcp_setup(crawler_url=None):
+    """What an AI app needs to start the MCP server on this machine: the
+    command, its arguments and the mcpServers block. `osc.py setup` prints it
+    and the app's "Use with AI" panel shows it, so the two cannot drift."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    py = sys.executable or 'python3'
+    # A scheduled task often runs the app with the windowless pythonw.exe; the
+    # MCP server talks over stdin and stdout, so name the console python.exe
+    # beside it when there is one.
+    name = os.path.basename(py)
+    if name.lower().startswith('pythonw'):
+        alt = os.path.join(os.path.dirname(py), 'python' + name[len('pythonw'):])
+        if os.path.exists(alt):
+            py = alt
+    server = os.path.join(here, 'mcp_server.py')
+    url = (crawler_url or DEFAULT_URL).rstrip('/')
+    entry = {'command': py, 'args': [server]}
+    if url != DEFAULT_URL:
+        entry['env'] = {'OSC_URL': url}
+    bundle = ''
+    try:
+        with open(os.path.join(here, 'server.json'), encoding='utf-8') as f:
+            bundle = next((p.get('identifier') or '' for p in json.load(f).get('packages') or []
+                           if p.get('registryType') == 'mcpb'), '')
+    except (OSError, ValueError):
+        pass
+    return {'name': 'open-seo-crawler', 'command': py, 'args': [server], 'env': entry.get('env') or {},
+            'server_exists': os.path.exists(server), 'crawler_url': url,
+            'config': {'mcpServers': {'open-seo-crawler': entry}}, 'bundle_url': bundle}
 
 
 def app_version():
@@ -268,11 +300,26 @@ def _js_str(v):
 
 
 def md_cell(v, limit=None):
-    """One table cell: one line, no pipes, capped (_scMdCell)."""
-    s = re.sub(r'[\r\n\t]+', ' ', _js_str(v)).replace('|', '/').strip()
+    """One table cell: one line, pipes escaped, capped (_scMdCell)."""
+    s = re.sub(r'[\r\n\t]+', ' ', _js_str(v)).strip()
     if limit and len(s) > limit:
         s = s[:limit - 1] + '…'
-    return s
+    return s.replace('|', '\\|')
+
+
+def _url_key(u):
+    return re.sub(r'/+$', '', _js_str(u))
+
+
+def _list5(urls):
+    urls = [_js_str(u) for u in urls]
+    return ', '.join(urls[:5]) + (f', and {len(urls) - 5} more' if len(urls) > 5 else '')
+
+
+# Files a crawl never fetches as pages; the same list as _NON_HTML_EXTS in app.py.
+_NON_HTML = re.compile(r'\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff|avif|pdf|docx?|xlsx?|pptx?|csv|txt|rtf|zip|tar|gz|7z|rar'
+                       r'|mp4|mov|webm|m4v|avi|mkv|mp3|wav|ogg|flac|css|js|json|xml|map|woff2?|ttf|otf|eot)$', re.I)
+_REDIRECT_ISSUE = re.compile(r'^(Redirect|HTTP→HTTPS redirect|www normalization redirect|Trailing slash redirect) \(')
 
 
 def _to_fixed(x, digits):
@@ -356,12 +403,40 @@ def build_brief(crawl, prompt=None, page_table=True, page_limit=200, max_urls=10
     times = [_num(r.get('response_time')) for r in rows]
     avg = sum(times) / len(times) if times else 0
     max_depth = max([r.get('depth') or 0 for r in rows] or [0])
-    exported = today or datetime.now(timezone.utc).date().isoformat()
+    # The user's calendar date, not UTC (the app uses the browser's local date).
+    exported = today or datetime.now().date().isoformat()
+
+    inlinks = crawl.get('inlinks') or {}
+    fetched = set()
+    for r in rows:
+        fetched.add(_url_key(r.get('url')))
+        if r.get('original_url'):
+            fetched.add(_url_key(r.get('original_url')))
+    linked_keys = {_url_key(u) for u, src in inlinks.items() if src}
+    unfetched = [u for u, src in inlinks.items()
+                 if src and _url_key(u) not in fetched and not _NON_HTML.search(re.split(r'[?#]', _js_str(u))[0])]
+    start = next((r for r in rows if not (r.get('depth') or 0)), None)
+
     add(['## Crawl overview', '',
          f'- Site: {site}',
-         f'- Exported: {exported}',
-         f'- Pages crawled: {len(rows)}',
-         f'- Indexable pages returning 200: {indexable}',
+         f'- Exported: {exported}'])
+    if start:
+        origin = start.get('original_url')
+        if origin and _url_key(origin) != _url_key(start.get('url')):
+            add([f'- Start URL: {_js_str(origin)} (redirects to {_js_str(start.get("url"))})'])
+        else:
+            add([f'- Start URL: {_js_str(start.get("url"))}'])
+    add([f'- Pages crawled: {len(rows)}'])
+    if inlinks:
+        n = len(unfetched)
+        if n:
+            add([f'- Coverage: partial. {n} internal URL{" is" if n == 1 else "s are"} linked from crawled pages '
+                 f'but {"was" if n == 1 else "were"} not crawled (page or depth limit, include or exclude rules, '
+                 'or robots.txt). Findings cover the crawled pages only, so a URL missing from this crawl is not '
+                 f'evidence that nothing links to it. Examples: {_list5(unfetched)}'])
+        else:
+            add(['- Coverage: complete. Every internal page link found on the crawled pages was crawled.'])
+    add([f'- Indexable pages returning 200: {indexable}',
          '- Status codes: ' + ', '.join(f'{c} ({codes[c]})' for c in sorted(codes)),
          f'- Average response time: {_to_fixed(avg, 2)} s',
          f'- Deepest page: {_js_str(max_depth)} click{"" if max_depth == 1 else "s"} from the start URL', ''])
@@ -374,6 +449,10 @@ def build_brief(crawl, prompt=None, page_table=True, page_limit=200, max_urls=10
             if g is None:
                 g = groups[label] = {'sev': sev_of(issue), 'pages': OrderedDict()}
             detail = issue if (issue != label and re.search(r'[(\d:]', issue)) else ''
+            origin = r.get('original_url')
+            if _REDIRECT_ISSUE.match(issue) and origin and _url_key(origin) != _url_key(r.get('url')):
+                status = r.get('redirect_status')
+                detail = f'{issue} from {_js_str(origin)}' + (f' ({_js_str(status)})' if status else '')
             if r.get('url') not in g['pages']:
                 g['pages'][r.get('url')] = detail
     for key, heading in (('error', 'Errors (must fix)'), ('warn', 'Warnings (should fix)'),
@@ -386,12 +465,20 @@ def build_brief(crawl, prompt=None, page_table=True, page_limit=200, max_urls=10
         for label, g in found:
             n = len(g['pages'])
             add([f'### {md_cell(label)} ({n} page{"" if n == 1 else "s"})'])
-            for i, (url, detail) in enumerate(g['pages'].items()):
-                if i >= max_urls:
-                    break
-                add([f'- {_js_str(url)}' + (f': {md_cell(detail, 160)}' if detail else '')])
-            if n > max_urls:
-                add([f'- and {n - max_urls} more'])
+            spared = [_js_str(r.get('url')) for r in rows if r.get('url') not in g['pages']]
+            if n > max_urls and len(spared) <= max_urls:
+                add([f'- Every crawled page except: {", ".join(spared)}' if spared else '- Every crawled page'])
+                details = [(url, d) for url, d in g['pages'].items() if d]
+                if len({d for _, d in details}) > 1:
+                    for url, d in details[:3]:
+                        add([f'- For example {_js_str(url)}: {md_cell(d, 160)}'])
+            else:
+                for i, (url, detail) in enumerate(g['pages'].items()):
+                    if i >= max_urls:
+                        break
+                    add([f'- {_js_str(url)}' + (f': {md_cell(detail, 160)}' if detail else '')])
+                if n > max_urls:
+                    add([f'- and {n - max_urls} more'])
             add([''])
 
     for key, heading in (('duplicate_titles', 'Duplicate titles'), ('duplicate_metas', 'Duplicate meta descriptions'),
@@ -430,17 +517,24 @@ def build_brief(crawl, prompt=None, page_table=True, page_limit=200, max_urls=10
         add(['## Sitemap analysis', '',
              f'- Sitemaps found: {found_maps}',
              f'- URLs in sitemap: {_js_str(t.get("urls_in_sitemap") or 0)}; URLs crawled: {_js_str(t.get("urls_in_crawl") or 0)}'])
-        for key, label in (('missing_from_sitemap', 'Crawled and indexable but missing from the sitemap'),
-                           ('sitemap_only', 'In the sitemap but not reached by any internal link'),
-                           ('non_200_in_sitemap', 'In the sitemap but not returning 200'),
-                           ('redirects_in_sitemap', 'Redirecting URLs in the sitemap'),
-                           ('non_indexable_in_sitemap', 'Noindex URLs in the sitemap')):
-            items = sm['reports'].get(key) or []
-            if not items:
-                continue
-            urls = [it if isinstance(it, str) else _js_str((it or {}).get('url')) for it in items]
-            more = f', and {len(urls) - 5} more' if len(urls) > 5 else ''
-            add([f'- {label} ({len(urls)}): {", ".join(urls[:5])}{more}'])
+        def sm_urls(key):
+            return [it if isinstance(it, str) else _js_str((it or {}).get('url')) for it in (sm['reports'].get(key) or [])]
+
+        def sm_line(label, urls):
+            if urls:
+                add([f'- {label} ({len(urls)}): {_list5(urls)}'])
+
+        sm_line('Crawled and indexable but missing from the sitemap', sm_urls('missing_from_sitemap'))
+        not_crawled = sm_urls('sitemap_only')
+        sm_line('In the sitemap and linked from crawled pages, but not crawled',
+                [u for u in not_crawled if _url_key(u) in linked_keys])
+        sm_line('In the sitemap and not linked from any crawled page (possible orphans; the crawl was partial, '
+                'so pages it did not reach may link to them)' if unfetched
+                else 'In the sitemap and not linked from any crawled page (possible orphans)',
+                [u for u in not_crawled if _url_key(u) not in linked_keys])
+        sm_line('In the sitemap but not returning 200', sm_urls('non_200_in_sitemap'))
+        sm_line('Redirecting URLs in the sitemap', sm_urls('redirects_in_sitemap'))
+        sm_line('Noindex URLs in the sitemap', sm_urls('non_indexable_in_sitemap'))
         for w in (sm.get('warnings') or []):
             add([f'- Note: {md_cell(w, 200)}'])
         add([''])

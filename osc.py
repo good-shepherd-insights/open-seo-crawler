@@ -244,14 +244,15 @@ def cmd_mcp(args):
 
 
 def cmd_setup(args):
-    py = sys.executable or 'python3'
-    server = os.path.join(HERE, 'mcp_server.py')
-    block = {'mcpServers': {'open-seo-crawler': {'command': py, 'args': [server]}}}
+    info = at.mcp_setup(at.base_url())
+    py, server = info['command'], info['args'][0]
+    block = info['config']
     if args.json:
         print(json.dumps(block, indent=2))
         return 0
+    env = ''.join(f'{k}={v} ' for k, v in info['env'].items())
     print('Connect an AI app to Open SEO Crawler over MCP (stdio). It needs this command:\n')
-    print(f'  {py} {server}\n')
+    print(f'  {env}{py} {server}\n')
     print('Apps that read an mcpServers JSON block:\n')
     print(json.dumps(block, indent=2))
     print('\nApps with an "mcp add" command in the terminal:\n')
