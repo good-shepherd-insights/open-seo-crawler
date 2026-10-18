@@ -79,7 +79,12 @@ const matchesCategory = new Function(
 // One shared grouping function feeds every summary panel, so the panels
 // cannot disagree. Both panels must use it rather than a copy of their own.
 const normalizers = [new Function(grab("function _scIssueGroup(issue)", "\n}\n") + "\nreturn _scIssueGroup;")()];
-const panelsUsingShared = (SRC.match(/const normalize = _scIssueGroup;/g) || []).length;
+// Summary and the severity views both count through _scIssueTally, which
+// groups with _scIssueGroup.
+const panelsUsingShared = grab("function _scIssueTally(pages)", "\n}\n").includes("_scIssueGroup(issue)")
+  ? [grab("function _scRenderSummaryPanel()", "\n}\n"), grab("function _scRenderSeverityPanel(cat)", "\n}\n")]
+      .filter((f) => f.includes("_scIssueTally(")).length
+  : 0;
 
 let passed = 0;
 const failures = [];

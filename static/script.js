@@ -235,13 +235,13 @@ function safeHref(u) {
 }
 
 function _scCopyIcon(url) {
-  return `<button type="button" onclick="copyUrl(this,${jsArg(url || '')})" title="Copy URL" aria-label="Copy URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
+  return `<button type="button" onclick="copyUrl(this,${jsArg(url || '')})" title="Copy URL" aria-label="Copy URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 }
 function _scOpenIcon(url) {
-  return `${_scCopyIcon(url)}<a href="${safeHref(url)}" target="_blank" rel="noopener" title="Open in new tab" aria-label="Open in new tab" style="display:inline-block;color:var(--text-muted,#94a3b8);text-decoration:none;padding:3px 5px;vertical-align:middle;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+  return `${_scCopyIcon(url)}<a href="${safeHref(url)}" target="_blank" rel="noopener" title="Open in new tab" aria-label="Open in new tab" style="display:inline-block;color:var(--text-muted,#94a3b8);text-decoration:none;padding:3px 5px;vertical-align:middle;border-radius:4px;" onmouseover="this.style.color='var(--accent)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
 }
 function _scRefetchIcon(url) {
-  return `<button type="button" onclick="scRecrawlUrl(this,${jsArg(url || '')})" title="Re-crawl this URL" aria-label="Re-crawl this URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent,#6366f1)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.97"/></svg></button>`;
+  return `<button type="button" onclick="scRecrawlUrl(this,${jsArg(url || '')})" title="Re-crawl this URL" aria-label="Re-crawl this URL" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#94a3b8);padding:3px 5px;vertical-align:middle;line-height:1;border-radius:4px;" onmouseover="this.style.color='var(--accent)';this.style.background='var(--surface2,#f1f5f9)'" onmouseout="this.style.color='var(--text-muted,#94a3b8)';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.97"/></svg></button>`;
 }
 
 // One-time delegated click on the crawler tbody — clicking anywhere on a
@@ -269,7 +269,6 @@ function renderRow(d) {
   const tr = document.createElement('tr');
   tr.style.cursor = 'pointer';
   tr.dataset.url = d.url;
-  const statusColor = d.status_code >= 400 ? 'var(--err-fg)' : d.status_code >= 300 ? 'var(--warn-fg)' : 'var(--ok-fg)';
   // app.py canonicalizes redirect rows so result['url'] is the FINAL URL
   // and result['original_url'] is what we requested. For the URL column
   // we want the user to see the URL they (or an internal link) actually
@@ -285,16 +284,16 @@ function renderRow(d) {
         <span class="cs-cell-actions" style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;">${_scOpenIcon(d.url)}${_scRefetchIcon(d.url)}</span>
       </span>
     </td>
-    <td data-col="status" style="color:${statusColor};font-weight:700">${d.status_code}</td>
+    <td data-col="status">${(d.status_code || 0) >= 300 || !d.status_code ? `<span class="badge ${(d.status_code || 0) >= 400 || !d.status_code ? 'error' : 'warn'}">${d.status_code || 'none'}</span>` : d.status_code}</td>
     ${_scRedirToCell(d)}
     ${_scInlinksCell(d)}
-    <td data-col="title" title="${escapeHtml(d.title||'')}">${d.title ? escapeHtml(d.title) : '<em style="color:#ef4444">missing</em>'}</td>
+    <td data-col="title" title="${escapeHtml(d.title||'')}">${d.title ? escapeHtml(d.title) : '<em style="color:var(--err-fg)">missing</em>'}</td>
     <td data-col="tlen">${d.title_len || 0}</td>
-    <td data-col="meta" title="${escapeHtml(d.meta_description||'')}">${d.meta_description ? escapeHtml(d.meta_description) : '<em style="color:#ef4444">missing</em>'}</td>
+    <td data-col="meta" title="${escapeHtml(d.meta_description||'')}">${d.meta_description ? escapeHtml(d.meta_description) : '<em style="color:var(--err-fg)">missing</em>'}</td>
     ${_scH1Cells(d)}
     <td data-col="words">${d.word_count || 0}</td>
     <td data-col="speed">${d.response_time || 0}s</td>
-    <td data-col="issues">${issues || '<span style="color:#22c55e">OK</span>'}</td>
+    <td data-col="issues">${issues || '<span style="color:var(--ok-fg)">OK</span>'}</td>
   `;
   tbody.appendChild(tr);
 }
@@ -664,13 +663,12 @@ function renderDock() {
   if (outCount) outCount.textContent = outs.length;
 
   // Details pane
-  const statusColor = page.status_code >= 400 ? 'var(--err-fg)' : page.status_code >= 300 ? 'var(--warn-fg)' : 'var(--ok-fg)';
   const sec = page.security || {};
   const og = page.og_tags || {};
   const secBadge = (label, on) => `<span class="badge ${on?'info':'error'}" style="opacity:${on?1:.6}">${on?'✓':'✗'} ${label}</span>`;
   document.getElementById('dock-pane-details').innerHTML = `
     <dl class="kv">
-      <dt>Status</dt><dd style="color:${statusColor};font-weight:700">${page.status_code || '-'}</dd>
+      <dt>Status</dt><dd>${(page.status_code || 0) >= 300 ? `<span class="badge ${page.status_code >= 400 ? 'error' : 'warn'}">${page.status_code}</span>` : (page.status_code || '-')}</dd>
       <dt>Title</dt><dd>${page.title ? escapeHtml(page.title) : '<em>missing</em>'} <span style="color:var(--text-muted)">(${page.title_len || 0} chars)</span></dd>
       <dt>Meta description</dt><dd>${page.meta_description ? escapeHtml(page.meta_description) : '<em>missing</em>'} <span style="color:var(--text-muted)">(${page.meta_len || 0} chars)</span></dd>
       <dt>H1${(page.h1_list || []).length > 1 ? ` <span style="color:#ef4444">×${page.h1_list.length}</span>` : ''}</dt><dd>${page.h1 ? escapeHtml(page.h1) : '<em>missing</em>'}</dd>
@@ -917,9 +915,12 @@ function _scIssueGroup(issue) {
 // front, so the bar measures pages crawled against crawled plus still queued,
 // capped at the page limit. Like the desktop crawlers it can step back when
 // one page turns up many new links. Time left is a straight-line estimate
-// from the pace so far and only shows once there is a pace to go on.
+// from the pace so far, shown in whole minutes and only once there is a pace
+// to go on. After the crawl the same strip follows the post-crawl checks, so
+// it never says finished while the sitemap or bot check is still running.
 // =============================================================================
-const _scProg = { max: 0, start: 0, host: '', stopped: false, hideT: null };
+const _scProg = { max: 0, start: 0, host: '', stopped: false, hideT: null, samples: [], errors: 0, done: null, title: '' };
+const _scPhases = new Map();   // name -> { text, frac }
 
 function _scFmtDuration(sec) {
   sec = Math.max(0, Math.round(sec));
@@ -929,62 +930,142 @@ function _scFmtDuration(sec) {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
 }
 
-function _scProgressSet(pct, state, html) {
+function _scFmtLeft(sec) {
+  if (sec < 60) return 'under a minute left';
+  if (sec < 90 * 60) return `about ${Math.round(sec / 60)} min left`;
+  return `about ${(sec / 3600).toFixed(1)} h left`;
+}
+
+function _scProgressSet(pct, state, label, parts, running) {
   const box = document.getElementById('crawl-progress');
   if (!box) return;
   clearTimeout(_scProg.hideT);
   box.hidden = false;
-  document.body.classList.add('has-progress');
   box.dataset.state = state;
-  const bar = box.querySelector('[role="progressbar"]');
-  const text = document.getElementById('crawl-progress-text');
   const v = Math.max(0, Math.min(100, Math.round(pct)));
+  document.getElementById('crawl-progress-label').textContent = label;
   document.getElementById('crawl-progress-fill').style.width = `${v}%`;
-  text.innerHTML = html;
-  if (bar) { bar.setAttribute('aria-valuenow', String(v)); bar.setAttribute('aria-valuetext', text.textContent || `${v}%`); }
+  const text = document.getElementById('crawl-progress-text');
+  text.innerHTML = parts.filter(Boolean).join('');
+  document.getElementById('crawl-progress-actions').hidden = !running;
+  const bar = box.querySelector('[role="progressbar"]');
+  if (bar) {
+    bar.setAttribute('aria-valuenow', String(v));
+    bar.setAttribute('aria-valuetext', `${label}. ${text.textContent}`);
+  }
+}
+
+function _scProgressHideSoon(ms) {
+  clearTimeout(_scProg.hideT);
+  _scProg.hideT = setTimeout(() => {
+    const box = document.getElementById('crawl-progress');
+    if (box) box.hidden = true;
+  }, ms);
 }
 
 function _scProgressStart(url, maxPages, resumed) {
   let host = url;
   try { host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).host; } catch {}
-  Object.assign(_scProg, { max: maxPages, start: Date.now(), host, stopped: false });
-  _scProgressSet(0, 'running',
-    `<strong>${resumed ? 'Resuming' : 'Starting'} crawl of ${escapeHtml(host)}</strong><span>Waiting for the first page</span>`);
+  Object.assign(_scProg, { max: maxPages, start: Date.now(), host, stopped: false, samples: [], errors: 0, done: null });
+  if (!_scProg.title) _scProg.title = document.title;
+  _scPhases.clear();
+  _scProgressSet(0, 'running', `${resumed ? 'Resuming' : 'Starting'} crawl of ${host}`, ['<span>Waiting for the first page</span>'], true);
 }
 
-function _scProgressUpdate(crawled, queued) {
+function _scProgressUpdate(crawled, queued, errors) {
   if (!_scProg.start) return;
+  if (typeof errors === 'number') _scProg.errors = errors;
+  const now = Date.now();
   const total = Math.max(1, Math.min(_scProg.max || Infinity, crawled + queued));
   const pct = Math.min(100, (crawled / total) * 100);
-  const secs = (Date.now() - _scProg.start) / 1000;
-  const left = crawled >= 5 && total > crawled ? (secs / crawled) * (total - crawled) : null;
+  const secs = (now - _scProg.start) / 1000;
+  // Pace over the last 30 seconds, so a slow start does not drag it down.
+  _scProg.samples.push([now, crawled]);
+  while (_scProg.samples.length > 2 && now - _scProg.samples[0][0] > 30000) _scProg.samples.shift();
+  const [t0, c0] = _scProg.samples[0];
+  const rate = now - t0 > 3000 ? (crawled - c0) / ((now - t0) / 1000) : 0;
+  const left = crawled >= 20 && secs >= 15 && total > crawled
+    ? (rate > 0 ? (total - crawled) / rate : (secs / crawled) * (total - crawled)) : null;
   const atCap = _scProg.max && crawled + queued >= _scProg.max;
-  _scProgressSet(pct, 'running', [
-    `<strong>Crawling ${escapeHtml(_scProg.host)}</strong>`,
+  _scProgressSet(pct, 'running', `Crawling ${_scProg.host}`, [
     `<span class="cp-num">${Math.round(pct)}%</span>`,
     `<span>${crawled.toLocaleString()} of ${total.toLocaleString()} pages${atCap ? ' (page limit)' : ''}</span>`,
     `<span>${queued.toLocaleString()} queued</span>`,
-    `<span>${_scFmtDuration(secs)} elapsed</span>`,
-    left !== null ? `<span>about ${_scFmtDuration(left)} left</span>` : '',
-  ].join(''));
+    _scProg.errors ? `<span class="cp-err">${_scProg.errors.toLocaleString()} error${_scProg.errors === 1 ? '' : 's'}</span>` : '',
+    rate > 0 ? `<span class="cp-wide">${rate.toFixed(1)} pages/s</span>` : '',
+    `<span class="cp-wide">${_scFmtDuration(secs)}</span>`,
+    left !== null ? `<span>${_scFmtLeft(left)}</span>` : '',
+  ], true);
+  document.title = `${Math.round(pct)}% crawling ${_scProg.host} - Open SEO Crawler`;
 }
 
 function _scProgressPaused(fetched, queued, max) {
-  _scProgressSet(100, 'paused',
-    `<strong>Paused at the page limit</strong><span>${Number(fetched).toLocaleString()} of ${Number(max).toLocaleString()} pages crawled, ${Number(queued).toLocaleString()} still queued. Raise the limit or finish in the banner below.</span>`);
+  _scProgressSet(100, 'paused', 'Paused at the page limit', [
+    `<span>${Number(fetched).toLocaleString()} of ${Number(max).toLocaleString()} pages crawled, ${Number(queued).toLocaleString()} still queued. Raise the limit or finish in the banner below.</span>`,
+  ], false);
+  document.title = `Paused: ${_scProg.host} - Open SEO Crawler`;
 }
 
 function _scProgressDone(n) {
   if (!_scProg.start) return;
   const secs = (Date.now() - _scProg.start) / 1000;
   _scProg.start = 0;
-  _scProgressSet(100, _scProg.stopped ? 'stopped' : 'done',
-    `<strong>${_scProg.stopped ? 'Crawl stopped' : 'Crawl finished'}</strong><span>${n.toLocaleString()} page${n === 1 ? '' : 's'} in ${_scFmtDuration(secs)}</span>`);
-  _scProg.hideT = setTimeout(() => {
-    const box = document.getElementById('crawl-progress');
-    if (box) box.hidden = true;
-    document.body.classList.remove('has-progress');
-  }, 6000);
+  _scProg.done = { n, secs, stopped: _scProg.stopped };
+  if (_scProg.title) document.title = _scProg.title;
+  _scProgressRenderDone();
+}
+
+function _scProgressRenderDone() {
+  const d = _scProg.done;
+  if (!d) return;
+  if (_scPhases.size) return _scProgressRenderPhases();
+  _scProgressSet(100, d.stopped ? 'stopped' : 'done', d.stopped ? 'Crawl stopped' : 'Crawl finished',
+    [`<span>${d.n.toLocaleString()} page${d.n === 1 ? '' : 's'} in ${_scFmtDuration(d.secs)}</span>`], false);
+  _scProgressHideSoon(6000);
+}
+
+function _scProgressRenderPhases() {
+  const list = [..._scPhases.values()];
+  const sized = list.find(p => typeof p.frac === 'number');
+  const d = _scProg.done;
+  _scProgressSet(sized ? sized.frac * 100 : 0, sized ? 'running' : 'phase', 'Checking the results',
+    [d ? `<span>${d.n.toLocaleString()} pages crawled</span>` : '', ...list.map(p => `<span>${escapeHtml(p.text)}</span>`)], false);
+}
+
+// name, text: a check started or moved on; text null: it ended.
+function _scPhase(name, text, frac) {
+  if (text) _scPhases.set(name, { text, frac });
+  else _scPhases.delete(name);
+  if (_scProg.start) return;            // the crawl itself still owns the strip
+  if (_scPhases.size) _scProgressRenderPhases();
+  else if (_scProg.done) _scProgressRenderDone();
+  else _scProgressHideSoon(0);
+}
+
+function _scPhaseRun(name, text, fn) {
+  _scPhase(name, text);
+  return Promise.resolve().then(fn).catch(() => {}).finally(() => _scPhase(name, null));
+}
+
+// The settings column folds away while a crawl is on screen so the results
+// get the width; Settings in the top bar brings it back.
+function scSetSettingsCollapsed(collapsed) {
+  const wrap = document.querySelector('main.wrap');
+  const btn = document.getElementById('topbar-settings');
+  if (!wrap) return;
+  wrap.classList.toggle('settings-collapsed', collapsed);
+  if (btn) {
+    btn.hidden = false;
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+
+function scToggleSettings() {
+  const wrap = document.querySelector('main.wrap');
+  if (!wrap) return;
+  const show = wrap.classList.contains('settings-collapsed');
+  scSetSettingsCollapsed(!show);
+  if (show) { const u = document.getElementById('crawler-url'); if (u) u.focus(); }
 }
 
 function startCrawl(opts) {
@@ -1008,6 +1089,7 @@ function startCrawl(opts) {
 
   document.getElementById('crawler-start-btn').style.display = 'none';
   document.getElementById('crawler-stop-btn').style.display = '';
+  scSetSettingsCollapsed(true);
   document.getElementById('crawler-stats').style.display = 'grid';
   document.getElementById('crawler-empty').style.display = 'none';
   document.getElementById('crawler-results').style.display = '';
@@ -1092,7 +1174,7 @@ function startCrawl(opts) {
               document.getElementById('cs-crawled').textContent = p.crawled;
               document.getElementById('cs-queued').textContent = p.queued;
               document.getElementById('cs-errors').textContent = p.errors;
-              _scProgressUpdate(p.crawled, p.queued);
+              _scProgressUpdate(p.crawled, p.queued, p.errors);
               if (p.queue_sample !== undefined) {
                 crawlerUpdateQueuePanel(p.queue_sample, p.queued);
               }
@@ -1254,9 +1336,10 @@ function showToast(message, kind) {
     return s;
   })();
   const t = document.createElement('div');
-  // Deep enough for white text to stay readable (about 5:1 or better).
-  const bg = kind === 'error' ? '#dc2626' : kind === 'warn' ? '#b45309' : kind === 'success' ? '#15803d' : '#0369a1';
-  t.style.cssText = `background:${bg};color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,0.15);pointer-events:auto;`;
+  // A neutral snackbar with a coloured mark, not a full red or green fill.
+  const mark = { error: 'error', warn: 'warn', success: 'ok' }[kind] || '';
+  t.className = 'sc-toast' + (mark ? ` is-${mark}` : '');
+  t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
   t.textContent = message;
   stack.appendChild(t);
   setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
@@ -1509,117 +1592,120 @@ window.selectCategory = function(cat) {
 
   // Update title
   const titleMap = {
-    'all': 'All Pages', '__err': 'Pages with Errors (must fix)', '__warn': 'Pages with Warnings (should fix)', '__info': 'Pages with Info Issues',
-    'Missing meta description': 'Pages Missing Meta Description', 'Meta desc too long': 'Meta Description Too Long', 'Meta desc too short': 'Meta Description Too Short',
-    'Missing title': 'Pages Missing Title', 'Title too long': 'Title Too Long', 'Title too short': 'Title Too Short',
-    'Missing H1': 'Pages Missing H1', 'Multiple H1s': 'Pages with Multiple H1s', 'H1 identical to title tag': 'H1 Same as Title',
-    'Missing canonical': 'Pages Missing Canonical', 'Canonicalised': 'Canonicalised Pages',
-    'images missing alt': 'Pages with Images Missing Alt Text', 'No schema': 'Pages Without Schema Markup',
-    'Thin content': 'Pages with Thin Content', 'Slow': 'Slow Pages (>3s)', 'Redirect': 'Redirected Pages',
-    'HTTP': 'HTTP Errors (4xx / 5xx)', 'noindex': 'Noindex Pages',
-    'Missing Open Graph': 'Pages Missing Open Graph Tags', 'Missing og:image': 'Pages Missing og:image',
-    'Missing Twitter Card': 'Pages Missing Twitter Card', 'Missing viewport': 'Pages Missing Viewport Meta',
-    'Mixed content': 'HTTPS Pages Loading HTTP Resources', 'URL:': 'URL Hygiene Issues',
+    'all': 'All pages', '__err': 'Pages with errors (must fix)', '__warn': 'Pages with warnings (should fix)', '__info': 'Pages with info issues',
+    'Missing meta description': 'Pages missing meta description', 'Meta desc too long': 'Meta description too long', 'Meta desc too short': 'Meta description too short',
+    'Missing title': 'Pages missing title', 'Title too long': 'Title too long', 'Title too short': 'Title too short',
+    'Missing H1': 'Pages missing H1', 'Multiple H1s': 'Pages with multiple H1s', 'H1 identical to title tag': 'H1 same as title',
+    'Missing canonical': 'Pages missing canonical', 'Canonicalised': 'Canonicalised pages',
+    'images missing alt': 'Pages with images missing alt text', 'No schema': 'Pages without schema markup',
+    'Thin content': 'Pages with thin content', 'Slow': 'Slow pages (>3s)', 'Redirect': 'Redirected pages',
+    'HTTP': 'HTTP errors (4xx / 5xx)', 'noindex': 'Noindex pages',
+    'Missing Open Graph': 'Pages missing Open Graph tags', 'Missing og:image': 'Pages missing og:image',
+    'Missing Twitter Card': 'Pages missing Twitter card', 'Missing viewport': 'Pages missing viewport meta',
+    'Mixed content': 'HTTPS pages loading HTTP resources', 'URL:': 'URL hygiene issues',
     // page_checks.py findings
-    'Title outside head': 'Title Outside <head> (moved into the body, so Google ignores it)',
-    'Canonical outside head': 'Canonical Outside <head> (ignored, page self-canonicalises)',
-    'local staging links': 'Links to a Local or Staging Host',
-    'insecure forms': 'Forms That Submit Over HTTP',
-    'image dimensions': 'Images With No Width or Height (layout shift)',
-    'pagination not linked': 'Pagination URLs Not Linked in an Anchor Tag',
-    'hreflang no return': 'Hreflang Alternates That Do Not Link Back',
-    'Lorem ipsum placeholder text in the page copy': 'Pages With Lorem Ipsum Placeholder Text',
-    'Canonical contains a fragment': 'Canonical Containing a Fragment',
-    'Canonical points to a non-200 URL': 'Canonical Pointing at a Non-200 URL',
-    'Canonical points to a URL that redirects': 'Canonical Pointing at a Redirect',
-    'Canonical points to a non-indexable URL': 'Canonical Pointing at a Non-Indexable URL',
-    'No <head> element': 'Pages With No <head> Element',
-    'No <body> element': 'Pages With No <body> Element',
-    'HTML document over 2MB': 'HTML Documents Over 2MB',
-    'No internal outlinks': 'Pages With No Internal Outlinks (dead ends)',
-    'Inbound internal links come only from non-indexable pages': 'Pages Linked Only From Non-Indexable Pages',
-    'Meta robots outside head': 'Meta Robots Outside <head> (directive ignored)',
-    'Meta description outside head': 'Meta Description Outside <head> (ignored)',
-    'Hreflang outside head': 'Hreflang Outside <head> (cluster unread)',
-    'Multiple title tags': 'Pages With More Than One Title Tag',
-    'Multiple conflicting canonicals': 'Pages With Conflicting Canonical Tags',
-    'Multiple canonical tags': 'Pages With a Repeated Canonical Tag',
-    'Multiple meta descriptions': 'Pages With More Than One Meta Description',
-    'Multiple viewport tags': 'Pages With More Than One Viewport Tag',
-    'Canonical conflict: HTML and HTTP header disagree': 'Canonical Conflict Between HTML and HTTP Header',
-    'Canonical only in the HTTP header': 'Canonical Delivered Only by HTTP Header',
-    'Canonical points to HTTP from an HTTPS page': 'Canonical Pointing to HTTP From an HTTPS Page',
-    'Canonical is a relative URL': 'Pages With a Relative Canonical URL',
-    'Canonical points to another host': 'Canonical Pointing to Another Host',
-    'Canonical is malformed': 'Malformed Canonical (unresolved template variable)',
-    'Noindex plus a canonical to another URL': 'Noindex Combined With a Canonical Elsewhere',
-    'Canonical URL is missing from the hreflang set': 'Canonical Missing From the Hreflang Set',
-    'noindex in the X-Robots-Tag header': 'Noindex Set by the X-Robots-Tag Header',
-    'Conflicting robots directives': 'Conflicting Robots Directives (index and noindex)',
-    'Robots "none"': 'Pages With robots "none" (noindex plus nofollow)',
-    'nosnippet': 'Pages With nosnippet (no description in results)',
-    'noarchive': 'Pages With noarchive (kept out of Bing Copilot)',
-    'nocache': 'Pages With nocache (Bing Copilot: title and snippet only)',
-    'max-snippet limits the text Google can show, AI answers included': 'Pages With a Low max-snippet',
-    'data-nosnippet keeps sections out of snippets and AI answers': 'Pages With data-nosnippet Sections',
-    '__bots': 'Bot Readability: what each crawler gets from a sample of pages',
-    'Content needs JavaScript': 'Pages Whose Content Needs JavaScript',
-    'noindex in the HTML is removed by JavaScript': 'noindex Removed by JavaScript (Google may skip rendering)',
-    'Mobile page has less content than desktop': 'Mobile Pages With Less Content Than Desktop',
-    'Mobile and desktop pages differ': 'Mobile and Desktop Pages That Differ',
-    'unavailable_after date has passed': 'Pages Whose unavailable_after Date Has Passed',
+    'Title outside head': 'Title outside <head> (moved into the body, so Google ignores it)',
+    'Canonical outside head': 'Canonical outside <head> (ignored, page self-canonicalises)',
+    'local staging links': 'Links to a local or staging host',
+    'insecure forms': 'Forms that submit over HTTP',
+    'image dimensions': 'Images with no width or height (layout shift)',
+    'pagination not linked': 'Pagination URLs not linked in an anchor tag',
+    'hreflang no return': 'Hreflang alternates that do not link back',
+    'Lorem ipsum placeholder text in the page copy': 'Pages with lorem ipsum placeholder text',
+    'Canonical contains a fragment': 'Canonical containing a fragment',
+    'Canonical points to a non-200 URL': 'Canonical pointing at a non-200 URL',
+    'Canonical points to a URL that redirects': 'Canonical pointing at a redirect',
+    'Canonical points to a non-indexable URL': 'Canonical pointing at a non-indexable URL',
+    'No <head> element': 'Pages with no <head> element',
+    'No <body> element': 'Pages with no <body> element',
+    'HTML document over 2MB': 'HTML documents over 2MB',
+    'No internal outlinks': 'Pages with no internal outlinks (dead ends)',
+    'Inbound internal links come only from non-indexable pages': 'Pages linked only from non-indexable pages',
+    'Meta robots outside head': 'Meta robots outside <head> (directive ignored)',
+    'Meta description outside head': 'Meta description outside <head> (ignored)',
+    'Hreflang outside head': 'Hreflang outside <head> (cluster unread)',
+    'Multiple title tags': 'Pages with more than one title tag',
+    'Multiple conflicting canonicals': 'Pages with conflicting canonical tags',
+    'Multiple canonical tags': 'Pages with a repeated canonical tag',
+    'Multiple meta descriptions': 'Pages with more than one meta description',
+    'Multiple viewport tags': 'Pages with more than one viewport tag',
+    'Canonical conflict: HTML and HTTP header disagree': 'Canonical conflict between HTML and HTTP header',
+    'Canonical only in the HTTP header': 'Canonical delivered only by HTTP header',
+    'Canonical points to HTTP from an HTTPS page': 'Canonical pointing to HTTP from an HTTPS page',
+    'Canonical is a relative URL': 'Pages with a relative canonical URL',
+    'Canonical points to another host': 'Canonical pointing to another host',
+    'Canonical is malformed': 'Malformed canonical (unresolved template variable)',
+    'Noindex plus a canonical to another URL': 'Noindex combined with a canonical elsewhere',
+    'Canonical URL is missing from the hreflang set': 'Canonical missing from the hreflang set',
+    'noindex in the X-Robots-Tag header': 'Noindex set by the X-Robots-Tag header',
+    'Conflicting robots directives': 'Conflicting robots directives (index and noindex)',
+    'Robots "none"': 'Pages with robots "none" (noindex plus nofollow)',
+    'nosnippet': 'Pages with nosnippet (no description in results)',
+    'noarchive': 'Pages with noarchive (kept out of Bing Copilot)',
+    'nocache': 'Pages with nocache (Bing Copilot: title and snippet only)',
+    'max-snippet limits the text Google can show, AI answers included': 'Pages with a low max-snippet',
+    'data-nosnippet keeps sections out of snippets and AI answers': 'Pages with data-nosnippet sections',
+    '__bots': 'Bot readability: what each crawler gets from a sample of pages',
+    'Content needs JavaScript': 'Pages whose content needs JavaScript',
+    'noindex in the HTML is removed by JavaScript': 'noindex removed by JavaScript (Google may skip rendering)',
+    'Mobile page has less content than desktop': 'Mobile pages with less content than desktop',
+    'Mobile and desktop pages differ': 'Mobile and desktop pages that differ',
+    'unavailable_after date has passed': 'Pages whose unavailable_after date has passed',
     'soft 404': 'Soft 404s (200 status on a page that says it is missing)',
-    'Title may truncate in results': 'Titles Wide Enough to Truncate (pixel width, not characters)',
-    'Meta description may truncate in results': 'Meta Descriptions Wide Enough to Truncate',
-    'No self-referencing hreflang entry': 'Hreflang Sets Missing a Self-Reference',
-    'Invalid hreflang code': 'Invalid Hreflang Language or Region Codes',
-    'Duplicate hreflang code with different URLs': 'Duplicate Hreflang Codes Pointing at Different URLs',
-    'lang vs hreflang': 'HTML lang Disagreeing With the Hreflang Entry for This Page',
-    'No lang attribute on <html>': 'Pages With No lang Attribute',
-    'Invalid lang attribute': 'Pages With an Invalid lang Attribute',
-    'H1 too long': 'Pages With an H1 Over 70 Characters',
-    'first heading': 'Pages Whose First Heading Is Not an H1',
-    'Heading level skips': 'Pages That Skip a Heading Level',
-    'internal http links': 'Pages Linking to HTTP Versions of Their Own Site',
-    'internal nofollow': 'Pages With Nofollowed Internal Links',
-    'dead anchors': 'Pages With On-Page Anchors Pointing at Nothing',
-    'long alt': 'Images With Alt Text Over 150 Characters',
-    'No compression': 'Pages Served Without gzip or brotli',
-    'No cache-control header': 'Pages With No Cache-Control Header',
-    'No doctype': 'Pages With No Doctype (quirks mode)',
-    'Multiple head elements': 'Pages With More Than One <head>',
-    'Multiple body elements': 'Pages With More Than One <body>',
-    'No charset declared': 'Pages With No Declared Character Encoding',
-    'charset': 'Pages Declaring an Encoding Other Than UTF-8',
-    'Large DOM': 'Pages Over 1,500 DOM Elements',
-    'Paginated page set to noindex': 'Paginated Pages Set to Noindex',
-    'Paginated page canonicalised to another URL': 'Paginated Pages Canonicalised Away',
-    '__sm_missing': 'Missing from Sitemap', '__sm_orphan': 'Orphan in Sitemap',
-    '__sm_only': 'In Sitemap, Not Crawled', '__sm_noindex': 'Non-Indexable in Sitemap',
-    '__sm_non200': 'Non-200 in Sitemap', '__sm_redirects': 'Redirects in Sitemap',
-    '__sm_pagination': 'Pagination in Sitemap',
-    '__nd_content': 'Near-Duplicate Content: pairs above the similarity threshold',
-    '__schema_by_page': 'Schema by Page: every crawled page with the schema types it emits',
-    '__sitemap_viz': 'Site Structure: sunburst, hierarchy and anchor-text cloud',
-    '__all_images': 'All Images: every image across the crawl with alt text and the page(s) it appears on',
-    '__external_links': 'External Links: every off-domain link with rel/target attributes. Filter by follow / nofollow / same-window. Risky = follow + same-window (leaks link equity AND loses the visitor).',
-    '__js_diff': 'JS vs non-JS Diff: pages whose content differs between rendered and raw HTML',
-    '__all_titles':    'All Titles: every crawled page with its title tag',
-    '__all_metas':     'All Meta Descriptions: every crawled page with its meta description',
+    'Title may truncate in results': 'Titles wide enough to truncate (pixel width, not characters)',
+    'Meta description may truncate in results': 'Meta descriptions wide enough to truncate',
+    'No self-referencing hreflang entry': 'Hreflang sets missing a self-reference',
+    'Invalid hreflang code': 'Invalid hreflang language or region codes',
+    'Duplicate hreflang code with different URLs': 'Duplicate hreflang codes pointing at different URLs',
+    'lang vs hreflang': 'HTML lang disagreeing with the hreflang entry for this page',
+    'No lang attribute on <html>': 'Pages with no lang attribute',
+    'Invalid lang attribute': 'Pages with an invalid lang attribute',
+    'H1 too long': 'Pages with an H1 over 70 characters',
+    'first heading': 'Pages whose first heading is not an H1',
+    'Heading level skips': 'Pages that skip a heading level',
+    'internal http links': 'Pages linking to HTTP versions of their own site',
+    'internal nofollow': 'Pages with nofollowed internal links',
+    'dead anchors': 'Pages with on-page anchors pointing at nothing',
+    'long alt': 'Images with alt text over 150 characters',
+    'No compression': 'Pages served without gzip or brotli',
+    'No cache-control header': 'Pages with no Cache-Control header',
+    'No doctype': 'Pages with no doctype (quirks mode)',
+    'Multiple head elements': 'Pages with more than one <head>',
+    'Multiple body elements': 'Pages with more than one <body>',
+    'No charset declared': 'Pages with no declared character encoding',
+    'charset': 'Pages declaring an encoding other than UTF-8',
+    'Large DOM': 'Pages over 1,500 DOM elements',
+    'Paginated page set to noindex': 'Paginated pages set to noindex',
+    'Paginated page canonicalised to another URL': 'Paginated pages canonicalised away',
+    '__sm_missing': 'Missing from sitemap', '__sm_orphan': 'Orphan in sitemap',
+    '__sm_only': 'In sitemap, not crawled', '__sm_noindex': 'Non-indexable in sitemap',
+    '__sm_non200': 'Non-200 in sitemap', '__sm_redirects': 'Redirects in sitemap',
+    '__sm_pagination': 'Pagination in sitemap',
+    '__nd_content': 'Near-duplicate content: pairs above the similarity threshold',
+    '__schema_by_page': 'Schema by page: every crawled page with the schema types it emits',
+    '__sitemap_viz': 'Site structure: sunburst, hierarchy and anchor-text cloud',
+    '__all_images': 'All images: every image across the crawl with alt text and the page(s) it appears on',
+    '__external_links': 'External links: every off-domain link with rel/target attributes. Filter by follow / nofollow / same-window. Risky = follow + same-window (leaks link equity AND loses the visitor).',
+    '__js_diff': 'JS vs non-JS diff: pages whose content differs between rendered and raw HTML',
+    '__all_titles':    'All titles: every crawled page with its title tag',
+    '__all_metas':     'All meta descriptions: every crawled page with its meta description',
     '__all_h1s':       'All H1s: every crawled page with its primary H1',
-    '__all_canonicals':'All Canonicals: every crawled page with its rel=canonical target',
-    '__dup_titles':    'Duplicate Titles: groups of pages sharing a title',
-    '__dup_metas':     'Duplicate Meta Descriptions: groups of pages sharing a meta description',
+    '__all_canonicals':'All canonicals: every crawled page with its rel=canonical target',
+    '__dup_titles':    'Duplicate titles: groups of pages sharing a title',
+    '__dup_metas':     'Duplicate meta descriptions: groups of pages sharing a meta description',
     '__dup_h1s':       'Duplicate H1s: groups of pages sharing an H1',
-    '__dup_bodies':    'Duplicate Body Content: groups of pages with identical body hash',
-    '__redir_chains':  'Redirect Chains (2+ hops)',
-    '__traps':         'Soft 404s / Infinite URL Trap (server answers 200 for non-existent URLs)',
-    '__response_codes':'Response Code Distribution',
-    '__deep':          'Deep Pages (4+ clicks from home)',
-    '__hreflang':      'Hreflang Implementation',
-    '__summary':       'Crawl Summary: what needs fixing, grouped by severity',
+    '__dup_bodies':    'Duplicate body content: groups of pages with identical body hash',
+    '__redir_chains':  'Redirect chains (2+ hops)',
+    '__traps':         'Soft 404s / infinite URL trap (server answers 200 for non-existent URLs)',
+    '__response_codes':'Response code distribution',
+    '__deep':          'Deep pages (4+ clicks from home)',
+    '__hreflang':      'Hreflang implementation',
+    '__summary':       'Crawl summary: what needs fixing, grouped by severity',
   };
   document.getElementById('detail-title-text').textContent = titleMap[cat] || cat;
+  // Summary and the severity views carry their own heading; one header per view.
+  const _dtBar = document.getElementById('detail-title');
+  if (_dtBar) _dtBar.style.display = ['__summary', '__err', '__warn', '__info'].includes(cat) ? 'none' : 'flex';
 
   // Report-style categories (sitemap analysis, schema-by-page) render
   // their own panel. Hide the entire table-wrap (not just the table)
@@ -1960,15 +2046,15 @@ function _scRenderJsDiffPanel() {
     const nojs = r.non_js || {};
     return `<div data-jsdiff-sev="${sev}" style="border:1px solid var(--border,#e5e7eb);border-radius:6px;margin:10px 14px;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2,#f8fafc);border-bottom:1px solid var(--border,#e5e7eb);">
-        <span style="display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid ${c.bd};background:${c.bg};color:${c.fg};font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">${sev}</span>
-        <a href="${esc(r.url || '')}" target="_blank" style="color:var(--accent,#6366f1);font-size:.78rem;font-weight:600;text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.url || '')}</a>
+        <span style="display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid ${c.bd};background:${c.bg};color:${c.fg};font-size:12px;font-weight:600;">${sev}</span>
+        <a href="${esc(r.url || '')}" target="_blank" style="color:var(--accent);font-size:.78rem;font-weight:600;text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.url || '')}</a>
         <span style="font-size:.7rem;color:var(--text-muted);">${(r.js_diff.fields || []).length} field${((r.js_diff.fields || []).length)===1?'':'s'} differ</span>
       </div>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:var(--surface,#fff);">
-          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border,#e5e7eb);"></th>
-          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border,#e5e7eb);border-left:1px solid var(--border,#e5e7eb);">Rendered (with JS)</th>
-          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border,#e5e7eb);border-left:1px solid var(--border,#e5e7eb);">Raw HTML (no JS)</th>
+          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border,#e5e7eb);"></th>
+          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border,#e5e7eb);border-left:1px solid var(--border,#e5e7eb);">Rendered (with JS)</th>
+          <th style="padding:5px 10px;font-size:.68rem;color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border,#e5e7eb);border-left:1px solid var(--border,#e5e7eb);">Raw HTML (no JS)</th>
         </tr></thead>
         <tbody>
           ${fieldRow('Title',           r.title,            nojs.title,            fields.has('title'))}
@@ -2956,196 +3042,185 @@ function _scRenderDeepPagesPanel() {
 // stacked by tier (errors → warnings → info). Each card clicks through
 // to the dedicated issue tab. Designed for users who don't know to
 // click Errors/Warnings — the summary surfaces everything at once.
-function _scRenderSummaryPanel() {
-  const main = document.querySelector('.results-panel') || document.getElementById('crawler-results');
-  if (!main) return;
-  const old = document.getElementById('summary-panel');
-  if (old) old.remove();
-  const panel = document.createElement('div');
-  panel.id = 'summary-panel';
-  panel.style.cssText = 'flex:1;overflow:auto;min-height:0;padding:18px 20px;font-size:13px;';
+// Summary, and the Errors / Warnings / Info views, laid out like the
+// overview pages of the desktop and hosted crawlers: what was crawled, the
+// issues by severity, then one table of issues (mark, name, pages, share).
+const _SC_SEV_ORDER = { error: 0, warn: 1, info: 2 };
+const _SC_SEV_NAME = { error: 'Errors', warn: 'Warnings', info: 'Info' };
+const _SC_SEV_CAT = { error: '__err', warn: '__warn', info: '__info' };
 
-  const pages = crawlerResults || [];
-  if (!pages.length) {
-    panel.innerHTML = `<div style="padding:60px 20px;text-align:center;color:var(--text-muted);">${crawlerTimer
-      ? 'Crawl starting. This summary fills in as pages arrive.'
-      : 'No crawl loaded.'}</div>`;
-    main.appendChild(panel);
-    return;
-  }
-
-  // Reuse the severity panel's grouping logic — duplicated here because
-  // _scRenderSeverityPanel writes into the DOM directly; we want the
-  // groups data without mounting.
-  const normalize = _scIssueGroup;
-  const groupsBySev = { error: new Map(), warn: new Map(), info: new Map() };
-  let pagesAffected = { error: 0, warn: 0, info: 0 };
+function _scIssueTally(pages) {
+  const groups = new Map();
+  const affected = { error: 0, warn: 0, info: 0 };
   for (const r of pages) {
     const seenSev = new Set();
-    const seenSlug = new Set();
-    for (const issue of (r.issues || [])) {
-      const s = sevOf(issue);
-      if (!groupsBySev[s]) continue;
-      const [label, slug] = normalize(issue);
-      if (seenSlug.has(slug)) continue;
-      seenSlug.add(slug);
-      const g = groupsBySev[s];
-      if (!g.has(slug)) g.set(slug, { label, count: 0 });
-      g.get(slug).count++;
-      seenSev.add(s);
-    }
-    for (const s of seenSev) pagesAffected[s]++;
-  }
-
-  const stat = (label, value, color) => `
-    <div style="flex:1;min-width:130px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:4px;">${label}</div>
-      <div style="font-size:26px;font-weight:700;color:${color};font-variant-numeric:tabular-nums;line-height:1.1;">${value}</div>
-    </div>`;
-
-  const tier = (title, sevKey, sevColor) => {
-    const g = groupsBySev[sevKey];
-    const rows = Array.from(g.entries())
-      .map(([slug, v]) => ({ slug, label: v.label, count: v.count }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    if (!rows.length) {
-      return `
-        <div style="margin-top:18px;">
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-            <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};"></span>
-            ${title}
-            <span style="color:var(--text-muted);font-weight:500;font-size:12px;">· nothing to fix</span>
-          </div>
-        </div>`;
-    }
-    return `
-      <div style="margin-top:18px;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-          <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};"></span>
-          ${title}
-          <span style="color:var(--text-muted);font-weight:500;font-size:12px;">· ${pagesAffected[sevKey]} page${pagesAffected[sevKey]===1?'':'s'} affected</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;">
-          ${rows.map(r => `
-            <div role="button" tabindex="0" onclick="selectCategory(${jsArg(r.slug)})"
-                 style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
-                 onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
-                 onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
-              <span style="font-weight:600;color:var(--text);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.label)}</span>
-              <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px;">
-                <span style="font-size:15px;font-weight:700;color:${sevColor};font-variant-numeric:tabular-nums;">${r.count}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
-              </span>
-            </div>
-          `).join('')}
-        </div>
-      </div>`;
-  };
-
-  panel.innerHTML = `
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-      ${stat('Pages crawled', pages.length, 'var(--text)')}
-      ${stat('Errors', pagesAffected.error, 'var(--err-fg)')}
-      ${stat('Warnings', pagesAffected.warn, 'var(--warn-fg)')}
-      ${stat('Info', pagesAffected.info, 'var(--info-fg)')}
-    </div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:10px;font-size:12.5px;color:var(--text-muted);line-height:1.55;">
-      Below: every distinct issue found, grouped by severity. <b style="color:var(--text);">Click any card</b> to see the affected URLs in its dedicated tab.
-    </div>
-    ${tier('Errors: must fix', 'error', 'var(--err-fg)')}
-    ${tier('Warnings: should fix', 'warn', 'var(--warn-fg)')}
-    ${tier('Info: intentional content states', 'info', 'var(--info-fg)')}
-  `;
-  main.appendChild(panel);
-}
-
-// Errors / Warnings / Info severity views: instead of a per-page row
-// table where Issues falls off the right edge, render a grouped list:
-// "Title too long — 7", "Missing meta description — 1". Each row click
-// jumps to the dedicated issue tab so the user can see the URLs.
-function _scRenderSeverityPanel(cat) {
-  const main = document.querySelector('.results-panel') || document.getElementById('crawler-results');
-  if (!main) return;
-  const old = document.getElementById('severity-panel');
-  if (old) old.remove();
-  const panel = document.createElement('div');
-  panel.id = 'severity-panel';
-  panel.style.cssText = 'flex:1;overflow:auto;min-height:0;padding:0;font-size:13px;';
-
-  const wantedSev = cat === '__err' ? 'error' : cat === '__warn' ? 'warn' : 'info';
-  // Map a raw issue string (e.g. "Title too long (61)") to (a) the
-  // displayable label and (b) the cat slug that selectCategory expects.
-  // Most issue strings collapse cleanly by stripping the " (N)" tail;
-  // a few need explicit mapping because the cat name diverges from the
-  // emitted issue text.
-  const normalize = _scIssueGroup;
-
-  // Group: normalized cat slug -> { label, count }
-  const groups = new Map();
-  for (const r of (crawlerResults || [])) {
     const seen = new Set();
     for (const issue of (r.issues || [])) {
-      if (sevOf(issue) !== wantedSev) continue;
-      const [label, slug] = normalize(issue);
-      if (seen.has(slug)) continue;   // one issue type per page in this count
-      seen.add(slug);
-      if (!groups.has(slug)) groups.set(slug, { label, count: 0 });
-      groups.get(slug).count++;
+      const sev = sevOf(issue);
+      if (!(sev in affected)) continue;
+      const [label, slug] = _scIssueGroup(issue);
+      const key = `${sev}|${slug}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!groups.has(key)) groups.set(key, { slug, label, sev, count: 0 });
+      groups.get(key).count++;
+      seenSev.add(sev);
     }
+    for (const sev of seenSev) affected[sev]++;
   }
-  const rows = Array.from(groups.entries())
-    .map(([slug, v]) => ({ slug, label: v.label, count: v.count }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const rows = [...groups.values()].sort((a, b) =>
+    _SC_SEV_ORDER[a.sev] - _SC_SEV_ORDER[b.sev] || b.count - a.count || a.label.localeCompare(b.label));
+  return { rows, affected };
+}
 
-  const sevLabel = cat === '__err' ? 'Errors' : cat === '__warn' ? 'Warnings' : 'Info';
-  const sevDesc  = cat === '__err'
-    ? 'Must-fix issues found across the crawl. Click any card to see the affected URLs.'
-    : cat === '__warn'
-    ? 'Should-fix issues. Click any card to see the affected URLs.'
-    : 'Informational findings (intentional content states). Click any to drill in.';
-  const sevColor = cat === '__err' ? '#ef4444' : cat === '__warn' ? '#f59e0b' : '#0ea5e9';
-  const totalPages = (crawlerResults || []).length;
-  const pagesAffected = (crawlerResults || []).filter(r => (r.issues || []).some(i => sevOf(i) === wantedSev)).length;
-  // Match the Summary view styling: stat cards on top, then a grid of
-  // clickable issue cards — same density and layout no matter which
-  // severity tab the user lands on. Was a centered 680px column before,
-  // which looked unrelated to Summary.
-  panel.style.padding = '18px 20px';
-  const stat = (label, value, color) => `
-    <div style="flex:1;min-width:130px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:4px;">${label}</div>
-      <div style="font-size:26px;font-weight:700;color:${color};font-variant-numeric:tabular-nums;line-height:1.1;">${value}</div>
-    </div>`;
-  const cardsHtml = rows.length ? `
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:18px;">
-      ${rows.map(r => `
-        <div role="button" tabindex="0" onclick="selectCategory(${jsArg(r.slug)})"
-             style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;transition:border-color .12s,background .12s;"
-             onmouseover="this.style.borderColor='${sevColor}';this.style.background='var(--surface2)'"
-             onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
-          <span style="font-weight:600;color:var(--text);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.label)}</span>
-          <span style="display:flex;align-items:center;gap:6px;margin-left:8px;flex-shrink:0;">
-            <span style="font-size:15px;font-weight:700;color:${sevColor};font-variant-numeric:tabular-nums;">${r.count}</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
-          </span>
-        </div>
-      `).join('')}
-    </div>` : `
-    <div style="margin-top:18px;padding:24px;border:1px dashed var(--border);border-radius:8px;text-align:center;color:var(--text-muted);font-size:13px;">
-      Nothing at this severity on the crawled pages.
-    </div>`;
+function _scIssuesTable(rows, total, limit) {
+  const shown = limit ? rows.slice(0, limit) : rows;
+  const body = shown.map(r => `
+    <tr>
+      <td class="mark"><span class="sev-mark ${r.sev}" title="${_SC_SEV_NAME[r.sev]}"></span></td>
+      <td><button type="button" class="link-btn" onclick="selectCategory(${jsArg(r.slug)})">${escapeHtml(r.label)}</button></td>
+      <td class="num">${r.count.toLocaleString()}</td>
+      <td class="num muted">${total ? Math.max(1, Math.round((r.count / total) * 100)) : 0}%</td>
+    </tr>`).join('');
+  return `<table class="issues-table">
+    <thead><tr><th class="mark"><span class="visually-hidden">Severity</span></th><th>Issue</th><th class="num">Pages</th><th class="num">Share of pages</th></tr></thead>
+    <tbody>${body}</tbody></table>`;
+}
 
-  panel.innerHTML = `
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-      ${stat('Pages crawled', totalPages, 'var(--text)')}
-      ${stat(sevLabel, pagesAffected, sevColor)}
-      ${stat('Issue types', rows.length, 'var(--text)')}
-    </div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:10px;font-size:12.5px;color:var(--text-muted);line-height:1.55;">
-      ${sevDesc}
-    </div>
-    ${cardsHtml}`;
+function _scSummaryPanelShell(id) {
+  const main = document.querySelector('.results-panel') || document.getElementById('crawler-results');
+  if (!main) return null;
+  const old = document.getElementById(id);
+  if (old) old.remove();
+  const panel = document.createElement('div');
+  panel.id = id;
+  panel.style.cssText = 'flex:1;overflow:auto;min-height:0;background:var(--bg);';
   main.appendChild(panel);
+  return panel;
+}
+
+function _scRenderSummaryPanel() {
+  const panel = _scSummaryPanelShell('summary-panel');
+  if (!panel) return;
+  const pages = crawlerResults || [];
+  if (!pages.length) {
+    panel.innerHTML = `<div class="sum"><div class="sum-empty">${crawlerTimer
+      ? 'Crawl starting. This summary fills in as pages arrive.'
+      : 'No crawl loaded.'}</div></div>`;
+    return;
+  }
+  const total = pages.length;
+  const { rows, affected } = _scIssueTally(pages);
+
+  // Crawled pages by status class, the bar Semrush and Ahrefs lead with.
+  const cls = { ok: 0, redirect: 0, client: 0, server: 0, none: 0 };
+  for (const r of pages) {
+    const c = r.status_code || 0;
+    if (c >= 200 && c < 300) cls.ok++;
+    else if (c >= 300 && c < 400) cls.redirect++;
+    else if (c >= 400 && c < 500) cls.client++;
+    else if (c >= 500) cls.server++;
+    else cls.none++;
+  }
+  const statusRows = [
+    ['ok', '2xx success', 'var(--ok-fg)'], ['redirect', '3xx redirect', 'var(--accent)'],
+    ['client', '4xx client error', 'var(--err-fg)'], ['server', '5xx server error', 'var(--warn-fg)'],
+    ['none', 'No response', 'var(--text-muted)'],
+  ].filter(([k]) => cls[k]);
+  const indexable = pages.filter(r => (r.status_code || 0) === 200 && r.indexable !== false).length;
+
+  const maxAff = Math.max(1, affected.error, affected.warn, affected.info);
+  const sevRows = ['error', 'warn', 'info'].map(sev => `
+    <li>
+      <span class="sev-mark ${sev}"></span>
+      <button type="button" class="link-btn" style="color:var(--text);" onclick="selectCategory('${_SC_SEV_CAT[sev]}')">${_SC_SEV_NAME[sev]}</button>
+      <span class="bar"><span style="width:${(affected[sev] / maxAff) * 100}%;background:var(--${sev === 'error' ? 'err' : sev}-fg);"></span></span>
+      <span class="v">${affected[sev].toLocaleString()}</span>
+    </li>`).join('');
+
+  // Start URL, coverage and depth, the "audit details" the desktop tools show.
+  const start = pages.find(r => !(r.depth || 0)) || pages[0];
+  const from = start.original_url && start.original_url.replace(/\/+$/, '') !== String(start.url).replace(/\/+$/, '') ? start.original_url : '';
+  const key = (u) => String(u || '').replace(/\/+$/, '');
+  const fetched = new Set();
+  for (const r of pages) { fetched.add(key(r.url)); if (r.original_url) fetched.add(key(r.original_url)); }
+  const NON_HTML = /\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff|avif|pdf|docx?|xlsx?|pptx?|csv|txt|rtf|zip|tar|gz|7z|rar|mp4|mov|webm|m4v|avi|mkv|mp3|wav|ogg|flac|css|js|json|xml|map|woff2?|ttf|otf|eot)$/i;
+  const inl = crawlerInlinks || {};
+  const unfetched = Object.keys(inl).filter(u => (inl[u] || []).length && !fetched.has(key(u)) && !NON_HTML.test(String(u).split(/[?#]/)[0])).length;
+  const times = pages.map(r => Number(r.response_time) || 0).filter(t => t > 0).sort((a, b) => a - b);
+  const median = times.length ? times[Math.floor(times.length / 2)] : 0;
+  const deepest = pages.reduce((m, r) => Math.max(m, r.depth || 0), 0);
+  let host = '';
+  try { host = new URL(start.url).host; } catch {}
+
+  const LIMIT = 12;
+  panel.innerHTML = `
+    <div class="sum">
+      <div class="sum-head">
+        <h2>Summary</h2>
+        <p>${escapeHtml(host)} · ${total.toLocaleString()} page${total === 1 ? '' : 's'} crawled${crawlerTimer ? ' so far' : ''}</p>
+      </div>
+      <div class="sum-cards">
+        <section class="card">
+          <h3 class="card-title">Crawled pages <button type="button" class="link-btn" onclick="selectCategory('__response_codes')">Response codes</button></h3>
+          <div class="sum-big">${total.toLocaleString()}</div>
+          <div class="stackbar">${statusRows.map(([k, , c]) => `<span style="width:${(cls[k] / total) * 100}%;background:${c};" title="${cls[k]}"></span>`).join('')}</div>
+          <ul class="kv-rows">
+            ${statusRows.map(([k, label, c]) => `<li><span class="dot" style="background:${c};"></span>${label}<span class="v">${cls[k].toLocaleString()}</span></li>`).join('')}
+            <li><span class="dot" style="background:transparent;"></span>Indexable 200s<span class="v">${indexable.toLocaleString()}</span></li>
+          </ul>
+        </section>
+        <section class="card">
+          <h3 class="card-title">Pages with issues <span class="muted">by severity</span></h3>
+          <ul class="kv-rows">${sevRows}</ul>
+        </section>
+        <section class="card">
+          <h3 class="card-title">Crawl details</h3>
+          <dl class="details">
+            <dt>Start URL</dt><dd>${escapeHtml(from || start.url)}${from ? ` <span class="muted">redirects to ${escapeHtml(start.url)}</span>` : ''}</dd>
+            <dt>Coverage</dt><dd>${Object.keys(inl).length
+              ? (unfetched ? `${unfetched.toLocaleString()} linked URL${unfetched === 1 ? '' : 's'} not crawled <span class="muted">(page or depth limit, or rules)</span>` : 'Every linked page crawled')
+              : '<span class="muted">Unknown</span>'}</dd>
+            <dt>Deepest page</dt><dd>${deepest} click${deepest === 1 ? '' : 's'} from the start</dd>
+            <dt>Median response</dt><dd>${median ? `${median.toFixed(2)} s` : '<span class="muted">n/a</span>'}</dd>
+          </dl>
+        </section>
+      </div>
+      <section class="card">
+        <h3 class="card-title">Issues <span class="muted">${rows.length} type${rows.length === 1 ? '' : 's'}, most pages first</span></h3>
+        ${rows.length ? `<div class="card-flush" id="sum-issues">${_scIssuesTable(rows, total, LIMIT)}</div>
+          ${rows.length > LIMIT ? `<div class="sum-more"><button type="button" class="link-btn" onclick="_scSummaryShowAll(this)">Show all ${rows.length} issues</button></div>` : ''}`
+          : '<div class="sum-empty">No issues found on the crawled pages.</div>'}
+      </section>
+    </div>`;
+}
+
+function _scSummaryShowAll(btn) {
+  const pages = crawlerResults || [];
+  const box = document.getElementById('sum-issues');
+  if (box) box.innerHTML = _scIssuesTable(_scIssueTally(pages).rows, pages.length);
+  if (btn && btn.parentNode) btn.parentNode.remove();
+}
+
+function _scRenderSeverityPanel(cat) {
+  const panel = _scSummaryPanelShell('severity-panel');
+  if (!panel) return;
+  const sev = cat === '__err' ? 'error' : cat === '__warn' ? 'warn' : 'info';
+  const pages = crawlerResults || [];
+  const { rows, affected } = _scIssueTally(pages);
+  const mine = rows.filter(r => r.sev === sev);
+  const desc = sev === 'error' ? 'Must fix.' : sev === 'warn' ? 'Should fix.' : 'Often intentional; check before acting.';
+  panel.innerHTML = `
+    <div class="sum">
+      <div class="sum-head">
+        <h2>${_SC_SEV_NAME[sev]}</h2>
+        <p>${desc} ${affected[sev].toLocaleString()} of ${pages.length.toLocaleString()} pages affected, ${mine.length} issue type${mine.length === 1 ? '' : 's'}.</p>
+      </div>
+      <section class="card">
+        ${mine.length ? `<div class="card-flush" style="border-top:0;margin-top:-16px;">${_scIssuesTable(mine, pages.length)}</div>`
+          : '<div class="sum-empty">Nothing at this severity on the crawled pages.</div>'}
+      </section>
+    </div>`;
 }
 
 function _scRenderHreflangPanel() {
@@ -3469,7 +3544,7 @@ function _renderNearDupPanel() {
   if (!pairs.length) {
     panel.innerHTML = `<div style="padding:20px;color:var(--text-muted,#64748b);font-size:13px;">
       Tick <b>Near-duplicate content</b> in the sidebar before crawling, or
-      <button type="button" onclick="runNearDupAnalysis().then(() => selectCategory('__nd_content'))" style="background:var(--accent,#6366f1);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer;margin:0 4px;">Run analysis now</button>
+      <button type="button" onclick="runNearDupAnalysis().then(() => selectCategory('__nd_content'))" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer;margin:0 4px;">Run analysis now</button>
       against the current crawl.
     </div>`;
     main.appendChild(panel);
@@ -3484,10 +3559,10 @@ function _renderNearDupPanel() {
     const sample = p.shared_phrase_sample || '-';
     return `<tr>
       <td style="font-variant-numeric:tabular-nums;font-weight:700;color:${simColor};">${sim}%</td>
-      <td title="${_scEscapeHtml(p.url_a)}"><a href="${safeHref(p.url_a)}" target="_blank" rel="noopener" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathA)}</a></td>
-      <td title="${_scEscapeHtml(p.url_b)}"><a href="${safeHref(p.url_b)}" target="_blank" rel="noopener" style="color:var(--accent,#6366f1);">${_scEscapeHtml(pathB)}</a></td>
+      <td title="${_scEscapeHtml(p.url_a)}"><a href="${safeHref(p.url_a)}" target="_blank" rel="noopener" style="color:var(--accent);">${_scEscapeHtml(pathA)}</a></td>
+      <td title="${_scEscapeHtml(p.url_b)}"><a href="${safeHref(p.url_b)}" target="_blank" rel="noopener" style="color:var(--accent);">${_scEscapeHtml(pathB)}</a></td>
       <td style="color:var(--text-muted,#64748b);font-family:monospace;font-size:.7rem;" title="${_scEscapeHtml(sample)}">${_scEscapeHtml(sample)}</td>
-      <td style="text-align:right;"><button type="button" onclick="openNdDiff(${jsArg(p.url_a || '')},${jsArg(p.url_b || '')})" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--accent,#6366f1);cursor:pointer;">Compare →</button></td>
+      <td style="text-align:right;"><button type="button" onclick="openNdDiff(${jsArg(p.url_a || '')},${jsArg(p.url_b || '')})" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--accent);cursor:pointer;">Compare →</button></td>
     </tr>`;
   }).join('');
   panel.innerHTML = `
@@ -3652,18 +3727,11 @@ function renderIssueInfo(cat) {
   const sourcesHtml = meta.sources.length
     ? `<div class="sources">Sources: ${meta.sources.map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener">${escapeHtml(t)}</a>`).join(' · ')}</div>`
     : '';
-  // Heading: the name the sidebar shows for this category. Internal keys
-  // such as "__dup_titles" or "imgs missing alt" used to be printed as-is.
-  const sideEl = [...document.querySelectorAll('.ci-cat')].find(e => e.dataset.cat === cat);
-  const sideSpan = sideEl ? sideEl.querySelector('span') : null;
-  const heading = (sideSpan && sideSpan.textContent.trim()) || cat.replace(/^_+/, '').replace(/_/g, ' ');
-  box.innerHTML = `<div class="info-box" style="display:flex;align-items:flex-start;gap:9px;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;opacity:.7;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    <div style="flex:1;min-width:0;">
-      <div style="font-weight:700;font-size:.73rem;margin-bottom:3px;">${escapeHtml(heading)}</div>
-      <div>${escapeHtml(meta.why)}</div>
-      ${sourcesHtml}
-    </div>
+  // The title bar above already names the view, so this is only the why and
+  // the sources: one header per view.
+  box.innerHTML = `<div class="info-box">
+    <div>${escapeHtml(meta.why)}</div>
+    ${sourcesHtml}
   </div>`;
   box.style.display = '';
 }
@@ -4816,26 +4884,28 @@ function openAiExport(tab) {
             <label class="ai-check"><input type="checkbox" id="ai-export-pages" checked> Include a page table (up to 200 pages, most issues first)</label>
             <div id="ai-export-stats" class="ai-stats"></div>
             <div class="ai-actions">
-              <button type="button" class="ai-btn ai-primary" id="ai-export-copy" onclick="copyAiBrief()">Copy brief</button>
-              <button type="button" class="ai-btn" id="ai-export-download" onclick="downloadAiBrief()">Download .md</button>
               <button type="button" class="ai-link" onclick="resetAiPrompt()">Reset prompt</button>
+              <span class="ai-spacer"></span>
+              <button type="button" class="ai-btn" id="ai-export-download" onclick="downloadAiBrief()">Download .md</button>
+              <button type="button" class="ai-btn ai-primary" id="ai-export-copy" onclick="copyAiBrief()">Copy brief</button>
             </div>
           </div>
         </section>
         <section id="ai-pane-connect" role="tabpanel" aria-labelledby="ai-tab-connect" class="ai-pane" hidden>
-          <p class="ai-lede">Let an AI app start crawls and read the results itself, through MCP. The app runs a small server on this computer that talks to this crawler; nothing goes anywhere else.</p>
+          <p class="ai-lede">Let an AI app start crawls and read the results itself, through MCP. The app runs a small server on this computer that talks only to this crawler.</p>
           <div id="ai-mcp-warn" class="ai-warn" hidden></div>
           <div class="ai-step">
-            <h3 class="ai-step-title"><span class="ai-step-n">1</span>Paste this into your AI app</h3>
+            <h3 class="ai-step-title">Paste this into your AI app</h3>
             <p class="ai-hint">For AI apps that can run commands on this computer. The app adds the server with its own command, checks the connection and tells you if it needs a restart.</p>
             <textarea id="ai-mcp-prompt" rows="9" readonly spellcheck="false"></textarea>
             <div class="ai-actions">
               <button type="button" class="ai-btn ai-primary" id="ai-mcp-copy" onclick="aiCopyField('ai-mcp-prompt', 'Setup prompt copied. Paste it into your AI app.')">Copy setup prompt</button>
             </div>
           </div>
+          <p class="ai-hint" id="ai-mcp-bundle" hidden></p>
           <div class="ai-step">
-            <h3 class="ai-step-title"><span class="ai-step-n">2</span>Then ask it something</h3>
-            <div class="ai-code-row"><code id="ai-mcp-ask" class="ai-code"></code><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-ask', 'Copied.')">Copy</button></div>
+            <h3 class="ai-step-title">Then ask it something</h3>
+            <div class="ai-code-row"><span id="ai-mcp-ask" class="ai-code ai-say"></span><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-ask', 'Copied.')">Copy</button></div>
           </div>
           <details class="ai-manual">
             <summary>Set it up by hand instead</summary>
@@ -4847,6 +4917,7 @@ function openAiExport(tab) {
             <div class="ai-code-row"><pre id="ai-mcp-json" class="ai-code"></pre><button type="button" class="ai-btn ai-btn-sm" onclick="aiCopyField('ai-mcp-json', 'Settings block copied.')">Copy</button></div>
             <p class="ai-hint" id="ai-mcp-links"></p>
           </details>
+          <p class="ai-foot">Once connected, what the tools return (URLs, titles, headings, issues, some page text) goes to that AI app and its provider under your account. Keep the app's approval prompts on for tools that start crawls or write files.</p>
         </section>
       </div>`;
     document.body.appendChild(modal);
@@ -4870,10 +4941,13 @@ function openAiExport(tab) {
   document.getElementById('ai-brief-form').hidden = !hasCrawl;
   if (hasCrawl) document.getElementById('ai-export-prompt').value = _scAiPrompt();
   modal.hidden = false;
-  aiExportTab(tab || (hasCrawl ? 'brief' : 'connect'));
+  let last = '';
+  try { last = localStorage.getItem('sc_ai_tab') || ''; } catch {}
+  aiExportTab(tab || (!hasCrawl ? 'connect' : (last === 'connect' ? 'connect' : 'brief')));
 }
 
 function aiExportTab(which) {
+  try { localStorage.setItem('sc_ai_tab', which); } catch {}
   for (const t of ['brief', 'connect']) {
     const on = t === which;
     const btn = document.getElementById(`ai-tab-${t}`);
@@ -4929,10 +5003,15 @@ function _scAiLoadMcpSetup() {
     document.getElementById('ai-mcp-cmd').textContent = (env.length ? env.map(([k, v]) => `${k}=${v} `).join('') : '') + cmd;
     document.getElementById('ai-mcp-add').textContent = `mcp add ${info.name} -- ${cmd}`;
     document.getElementById('ai-mcp-json').textContent = json;
-    const links = [];
-    if (info.bundle_url) links.push(`Desktop apps that install .mcpb bundles: <a href="${safeHref(info.bundle_url)}" target="_blank" rel="noopener">download the one-click bundle</a>.`);
-    links.push('<a href="https://github.com/puneetindersingh/open-seo-crawler#connect-an-ai-app" target="_blank" rel="noopener">Steps for each AI app</a> are in the README.');
-    document.getElementById('ai-mcp-links').innerHTML = links.join(' ');
+    // A desktop chat app cannot run the setup commands itself, so its
+    // one-click bundle is offered up front rather than inside the fold.
+    const bundle = document.getElementById('ai-mcp-bundle');
+    if (info.bundle_url) {
+      bundle.innerHTML = `Using a desktop AI app that installs <b>.mcpb</b> extensions? <a href="${safeHref(info.bundle_url)}" target="_blank" rel="noopener">Download the one-click bundle</a> and open it instead.`;
+      bundle.hidden = false;
+    }
+    document.getElementById('ai-mcp-links').innerHTML =
+      '<a href="https://github.com/puneetindersingh/open-seo-crawler#connect-an-ai-app" target="_blank" rel="noopener">Steps for each AI app</a> are in the README.';
     const warn = [];
     if (!info.same_machine) warn.push('This page is open from another computer. The AI app has to run on the computer where the crawler is installed.');
     if (!info.server_exists) warn.push('mcp_server.py is missing from this install. Update the crawler first.');
@@ -5106,7 +5185,10 @@ async function _scRunBotCheck() {
         if (!line.startsWith('data: ')) continue;
         let ev;
         try { ev = JSON.parse(line.slice(6)); } catch { continue; }
-        if (ev.type === 'progress') _scBotStatus(`Checking bots: ${ev.done} of ${ev.total} requests`);
+        if (ev.type === 'progress') {
+          _scBotStatus(`Checking bots: ${ev.done} of ${ev.total} requests`);
+          if (_scPhases.has('bots') && ev.total) _scPhase('bots', `Checking bot readability: ${ev.done} of ${ev.total} requests`, ev.done / ev.total);
+        }
         else if (ev.type === 'result') report = ev.report;
         else if (ev.type === 'error') throw new Error(ev.error || 'bot check failed');
       }
@@ -5261,21 +5343,28 @@ function crawlFinished() {
   if (Array.isArray(crawlerResults) && crawlerResults.length) {
     const _smCheckbox = document.getElementById('crawler-run-sitemap');
     if (_smCheckbox && _smCheckbox.checked && typeof window.analyseSitemap === 'function') {
+      _scPhase('sitemap', 'Checking the sitemap');
       setTimeout(() => {
-        try { window.analyseSitemap(); } catch (e) { console.warn('auto-analyseSitemap failed:', e); }
+        _scPhaseRun('sitemap', 'Checking the sitemap', () => window.analyseSitemap())
+          .catch(e => console.warn('auto-analyseSitemap failed:', e));
       }, 1500);
     }
     // Near-duplicate content analysis — opt-in via 'Near-duplicate content' checkbox.
     const _ndCheckbox = document.getElementById('crawler-run-neardup');
     if (_ndCheckbox && _ndCheckbox.checked && typeof window.runNearDupAnalysis === 'function') {
+      _scPhase('neardup', 'Finding near duplicates');
       setTimeout(() => {
-        try { window.runNearDupAnalysis(); } catch (e) { console.warn('auto-runNearDup failed:', e); }
+        _scPhaseRun('neardup', 'Finding near duplicates', () => window.runNearDupAnalysis())
+          .catch(e => console.warn('auto-runNearDup failed:', e));
       }, 1800);
     }
     // Bot readability check, on by default.
     const _botCheckbox = document.getElementById('crawler-run-bots');
     if (_botCheckbox && _botCheckbox.checked) {
-      window._scPostCrawlBotCheck = new Promise(res => setTimeout(() => { runBotCheck().then(res, res); }, 2500));
+      _scPhase('bots', 'Checking bot readability');
+      window._scPostCrawlBotCheck = new Promise(res => setTimeout(() => {
+        _scPhaseRun('bots', 'Checking bot readability', () => runBotCheck()).then(res, res);
+      }, 2500));
     } else {
       window._scPostCrawlBotCheck = null;
     }
@@ -5892,7 +5981,7 @@ function openCrawlLoader(opts) {
         <div id="crawl-loader-search-count" style="font-size:11px;color:#64748b;margin-top:6px;display:none;"></div>
       </div>`;
     const header = `
-      <div style="display:grid;grid-template-columns:95px 55px 1fr 100px 80px 200px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">
+      <div style="display:grid;grid-template-columns:95px 55px 1fr 100px 80px 200px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-weight:600;">
         <div>Date</div><div>Time</div><div>Website</div><div>Saved by</div><div style="text-align:right;">Pages</div><div></div>
       </div>`;
     const rows = crawls.map(c => {
@@ -5902,11 +5991,11 @@ function openCrawlLoader(opts) {
       const seed = (c.seed || '').replace(/^https?:\/\//,'').replace(/\/$/,'');
       const savedBy = (c.saved_by || 'unknown');
       const compareBtn = hasCurrent
-        ? `<button onclick="compareWithCurrent(${jsArg(c.file)}, ${jsArg(c.name || '')})" style="padding:6px 12px;font-size:11px;background:${compareOnly ? '#6366f1' : 'transparent'};color:${compareOnly ? '#fff' : '#6366f1'};border:1px solid #6366f1;border-radius:4px;cursor:pointer;font-weight:${compareOnly ? '600' : '400'};">Compare</button>`
+        ? `<button onclick="compareWithCurrent(${jsArg(c.file)}, ${jsArg(c.name || '')})" style="padding:6px 12px;font-size:11px;background:${compareOnly ? 'var(--accent)' : 'transparent'};color:${compareOnly ? '#fff' : 'var(--accent)'};border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-weight:${compareOnly ? '600' : '400'};">Compare</button>`
         : '';
       const loadBtn = compareOnly
         ? ''
-        : `<button onclick="loadSavedCrawl(${jsArg(c.file)})" style="padding:6px 10px;font-size:11px;background:#6366f1;color:#fff;border:0;border-radius:4px;cursor:pointer;">Load</button>`;
+        : `<button onclick="loadSavedCrawl(${jsArg(c.file)})" style="padding:6px 10px;font-size:11px;background:var(--accent);color:#fff;border:0;border-radius:4px;cursor:pointer;">Load</button>`;
       // Crawls saved by another tool are read-only here (the server refuses
       // to delete them), so they get no delete button.
       const delBtn = (compareOnly || (c.source && c.source !== 'site-crawler'))
@@ -6025,6 +6114,7 @@ function loadSavedCrawl(file) {
       if (results) results.style.display = '';
       if (sidebar) sidebar.style.display = '';
       if (stats) stats.style.display = 'grid';
+      scSetSettingsCollapsed(true);
       const tbody = document.getElementById('crawler-tbody');
       if (tbody) tbody.innerHTML = '';
       crawlerResults.forEach(r => { try { renderRow(r); } catch(e){} });
@@ -6137,7 +6227,7 @@ function _renderCompareModal(d, savedName) {
 
   const kpi = (label, a, b, opts) => `
     <div style="flex:1;min-width:130px;padding:12px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;">
-      <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${label}</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">${label}</div>
       <div style="display:flex;align-items:baseline;gap:8px;">
         <div style="font-size:20px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;">${b}</div>
         <div style="font-size:11px;color:#64748b;">was ${a}</div>
@@ -6178,10 +6268,10 @@ function _renderCompareModal(d, savedName) {
       <summary style="padding:12px 18px;cursor:pointer;font-weight:600;font-size:13px;">Status codes</summary>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr style="background:#f8fafc;">
-          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Code</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Old</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">New</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Δ</th>
+          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:12px;">Code</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Old</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">New</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Δ</th>
         </tr></thead>
         <tbody>${['2xx','3xx','4xx','5xx','other'].map(codeRow).join('')}</tbody>
       </table>
@@ -6198,7 +6288,7 @@ function _renderCompareModal(d, savedName) {
     return `<tr data-issue-idx="${idx}" data-expanded="0" style="border-bottom:1px solid #e2e8f0;${hasDrill ? 'cursor:pointer;' : ''}" ${hasDrill ? `onclick="_compareToggleIssueDrill(${idx})"` : ''}>
       <td style="padding:7px 14px;">
         ${hasDrill ? `<span class="ci-arrow" style="display:inline-block;width:10px;color:#64748b;font-size:10px;margin-right:4px;transition:transform .12s;">▶</span>` : '<span style="display:inline-block;width:14px;"></span>'}
-        <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(0,0,0,0.04);color:${sevColor};font-size:10px;font-weight:600;text-transform:uppercase;margin-right:6px;">${sev}</span><span style="font-size:12px;">${escHtml(it.issue)}</span>
+        <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(0,0,0,0.04);color:${sevColor};font-size:12px;font-weight:600;margin-right:6px;">${sev}</span><span style="font-size:12px;">${escHtml(it.issue)}</span>
       </td>
       <td style="padding:7px 14px;text-align:right;font-variant-numeric:tabular-nums;color:#64748b;">${it.a}</td>
       <td style="padding:7px 14px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">${it.b}</td>
@@ -6211,10 +6301,10 @@ function _renderCompareModal(d, savedName) {
       ${issues.length === 0 ? `<div style="padding:14px 18px;color:#64748b;font-size:12px;">No issues seen in either crawl.</div>` : `
       <table id="cmp-issues-table" style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr style="background:#f8fafc;">
-          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Issue</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Old</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">New</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Δ</th>
+          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:12px;">Issue</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Old</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">New</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Δ</th>
         </tr></thead>
         <tbody>${issues.map((it, i) => issueRow(it, i)).join('')}</tbody>
       </table>`}
@@ -6232,10 +6322,10 @@ function _renderCompareModal(d, savedName) {
       <summary style="padding:12px 18px;cursor:pointer;font-weight:600;font-size:13px;">Site structure (${structure.length} top-level directories)</summary>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr style="background:#f8fafc;">
-          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Directory</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Old</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">New</th>
-          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;">Δ</th>
+          <th style="padding:7px 14px;text-align:left;font-weight:600;color:#64748b;font-size:12px;">Directory</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Old</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">New</th>
+          <th style="padding:7px 14px;text-align:right;font-weight:600;color:#64748b;font-size:12px;">Δ</th>
         </tr></thead>
         <tbody>${structure.map(structRow).join('')}</tbody>
       </table>
@@ -6249,7 +6339,7 @@ function _renderCompareModal(d, savedName) {
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:'SF Mono','Menlo',monospace;">
         <span style="color:${signColor};font-weight:700;">${sign}</span>
         ${sc}
-        <a href="${safeHref(x.url)}" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;word-break:break-all;flex:1;min-width:0;">${escHtml(x.url)}</a>
+        <a href="${safeHref(x.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;word-break:break-all;flex:1;min-width:0;">${escHtml(x.url)}</a>
       </div>
       ${ti}
     </div>`;
@@ -6269,7 +6359,7 @@ function _renderCompareModal(d, savedName) {
       if (f === 'body_hash') { oldv = oldv ? oldv.slice(0, 8) + '…' : '-'; newv = newv ? newv.slice(0, 8) + '…' : '-'; }
       else { oldv = (oldv == null ? '-' : String(oldv)).slice(0, 220); newv = (newv == null ? '-' : String(newv)).slice(0, 220); }
       return `<div style="display:grid;grid-template-columns:120px 1fr;gap:8px;margin-top:4px;">
-        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">${FIELD_LABELS[f] || f}</div>
+        <div style="font-size:12px;color:#64748b;">${FIELD_LABELS[f] || f}</div>
         <div style="font-size:12px;">
           <div style="color:#ef4444;">− ${escHtml(oldv)}</div>
           <div style="color:#10b981;">+ ${escHtml(newv)}</div>
@@ -6278,7 +6368,7 @@ function _renderCompareModal(d, savedName) {
     }).join('');
     return `<div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">
       <div style="font-size:12px;font-family:'SF Mono','Menlo',monospace;word-break:break-all;margin-bottom:4px;">
-        <a href="${safeHref(c.url)}" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;">${escHtml(c.url)}</a>
+        <a href="${safeHref(c.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${escHtml(c.url)}</a>
       </div>
       ${fields}
     </div>`;
@@ -6302,9 +6392,9 @@ function _renderCompareModal(d, savedName) {
   document.getElementById('crawl-compare-tabs').innerHTML = tabs.map(t => {
     const isActive = t.id === active;
     const badge = (t.count != null && t.count > 0)
-      ? `<span style="margin-left:6px;padding:1px 7px;border-radius:10px;background:${t.color || (isActive ? '#6366f1' : '#f1f5f9')};color:${t.color || isActive ? '#fff' : '#64748b'};font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:600;">${t.count}</span>`
+      ? `<span style="margin-left:6px;padding:1px 7px;border-radius:10px;background:${t.color || (isActive ? 'var(--accent)' : '#f1f5f9')};color:${t.color || isActive ? '#fff' : '#64748b'};font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:600;">${t.count}</span>`
       : (t.count === 0 ? `<span style="margin-left:6px;padding:1px 7px;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:10.5px;font-variant-numeric:tabular-nums;">0</span>` : '');
-    return `<button type="button" onclick="_compareSwitchTab('${t.id}')" style="background:none;border:0;border-bottom:2px solid ${isActive ? '#6366f1' : 'transparent'};padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:${isActive ? 700 : 500};color:${isActive ? '#0f172a' : '#64748b'};display:inline-flex;align-items:center;gap:0;flex-shrink:0;">${t.label}${badge}</button>`;
+    return `<button type="button" onclick="_compareSwitchTab('${t.id}')" style="background:none;border:0;border-bottom:2px solid ${isActive ? 'var(--accent)' : 'transparent'};padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:${isActive ? 700 : 500};color:${isActive ? '#0f172a' : '#64748b'};display:inline-flex;align-items:center;gap:0;flex-shrink:0;">${t.label}${badge}</button>`;
   }).join('');
 
   let bodyHtml = '';
@@ -6312,14 +6402,14 @@ function _renderCompareModal(d, savedName) {
     bodyHtml = toplineHtml +
       `<div style="padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
         <div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;overflow:hidden;">
-          <div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Top moving issues</div>
+          <div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#64748b;">Top moving issues</div>
           ${(d.issues || []).slice(0, 8).length === 0 ? `<div style="padding:14px;color:#64748b;font-size:12px;">No issues changed.</div>` : `
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tbody>${(d.issues || []).slice(0, 8).map(it => `<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:7px 14px;">${escHtml(it.issue)}</td><td style="padding:7px 14px;text-align:right;color:#64748b;">${it.a}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${it.b}</td><td style="padding:7px 14px;text-align:right;">${delta(it.a, it.b)}</td></tr>`).join('')}</tbody>
           </table>`}
         </div>
         <div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;overflow:hidden;">
-          <div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Top moving directories</div>
+          <div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#64748b;">Top moving directories</div>
           ${(d.structure || []).filter(x => x.delta !== 0).slice(0, 8).length === 0 ? `<div style="padding:14px;color:#64748b;font-size:12px;">No directory changes.</div>` : `
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tbody>${(d.structure || []).filter(x => x.delta !== 0).slice(0, 8).map(s2 => `<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:7px 14px;font-family:'SF Mono','Menlo',monospace;">${escHtml(s2.path)}</td><td style="padding:7px 14px;text-align:right;color:#64748b;">${s2.a}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${s2.b}</td><td style="padding:7px 14px;text-align:right;">${delta(s2.a, s2.b, { lessIsBetter: false })}</td></tr>`).join('')}</tbody>
@@ -6329,19 +6419,19 @@ function _renderCompareModal(d, savedName) {
       <div style="padding:0 18px 18px;">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
           <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;background:#fff;">
-            <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">URLs added</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px;">URLs added</div>
             <div style="font-size:24px;font-weight:700;color:#10b981;font-variant-numeric:tabular-nums;">${s.added || 0}</div>
-            <button onclick="_compareSwitchTab('added')" style="margin-top:6px;background:none;border:0;color:#6366f1;font-size:12px;cursor:pointer;padding:0;">View →</button>
+            <button onclick="_compareSwitchTab('added')" style="margin-top:6px;background:none;border:0;color:var(--accent);font-size:12px;cursor:pointer;padding:0;">View →</button>
           </div>
           <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;background:#fff;">
-            <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">URLs removed</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px;">URLs removed</div>
             <div style="font-size:24px;font-weight:700;color:#ef4444;font-variant-numeric:tabular-nums;">${s.removed || 0}</div>
-            <button onclick="_compareSwitchTab('removed')" style="margin-top:6px;background:none;border:0;color:#6366f1;font-size:12px;cursor:pointer;padding:0;">View →</button>
+            <button onclick="_compareSwitchTab('removed')" style="margin-top:6px;background:none;border:0;color:var(--accent);font-size:12px;cursor:pointer;padding:0;">View →</button>
           </div>
           <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;background:#fff;">
-            <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">URLs changed</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px;">URLs changed</div>
             <div style="font-size:24px;font-weight:700;color:#f59e0b;font-variant-numeric:tabular-nums;">${s.changed || 0}</div>
-            <button onclick="_compareSwitchTab('changed')" style="margin-top:6px;background:none;border:0;color:#6366f1;font-size:12px;cursor:pointer;padding:0;">View →</button>
+            <button onclick="_compareSwitchTab('changed')" style="margin-top:6px;background:none;border:0;color:var(--accent);font-size:12px;cursor:pointer;padding:0;">View →</button>
           </div>
         </div>
         <div style="margin-top:10px;font-size:11px;color:#64748b;">Unchanged: ${s.unchanged || 0} URLs (same on both crawls)</div>
@@ -6413,15 +6503,15 @@ window._compareToggleIssueDrill = function(idx) {
     <td colspan="4" style="padding:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#e2e8f0;">
         <div style="background:#fff;">
-          <div style="padding:8px 12px;font-size:10.5px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Resolved <span style="color:#64748b;font-weight:500;">(${oat})</span></div>
+          <div style="padding:8px 12px;font-size:12px;font-weight:600;color:#10b981;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Resolved <span style="color:#64748b;font-weight:500;">(${oat})</span></div>
           <div style="max-height:340px;overflow:auto;">${renderList(onlyA, oat, 'No URLs resolved', '#10b981')}</div>
         </div>
         <div style="background:#fff;">
-          <div style="padding:8px 12px;font-size:10.5px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Newly broken <span style="color:#64748b;font-weight:500;">(${obt})</span></div>
+          <div style="padding:8px 12px;font-size:12px;font-weight:600;color:#ef4444;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Newly broken <span style="color:#64748b;font-weight:500;">(${obt})</span></div>
           <div style="max-height:340px;overflow:auto;">${renderList(onlyB, obt, 'No new URLs broken', '#ef4444')}</div>
         </div>
         <div style="background:#fff;">
-          <div style="padding:8px 12px;font-size:10.5px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Still failing <span style="color:#64748b;font-weight:500;">(${bt})</span></div>
+          <div style="padding:8px 12px;font-size:12px;font-weight:600;color:#f59e0b;border-bottom:1px solid #e2e8f0;background:#f8fafc;">Still failing <span style="color:#64748b;font-weight:500;">(${bt})</span></div>
           <div style="max-height:340px;overflow:auto;">${renderList(both, bt, 'None: issue cleared', '#f59e0b')}</div>
         </div>
       </div>
@@ -6569,7 +6659,7 @@ function _scRenderSiteStructure() {
 
   const tab = (id, label, icon) => `
     <button type="button" onclick="_svSwitchView('${id}')"
-      style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:${view===id?'var(--accent,#6366f1)':'var(--surface2,#f1f5f9)'};color:${view===id?'#fff':'var(--text,#0f172a)'};border:1px solid ${view===id?'var(--accent,#6366f1)':'var(--border,#e2e8f0)'};border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">
+      style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:${view===id?'var(--accent)':'var(--surface2,#f1f5f9)'};color:${view===id?'#fff':'var(--text,#0f172a)'};border:1px solid ${view===id?'var(--accent)':'var(--border,#e2e8f0)'};border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">
       <span style="font-size:14px;line-height:1;">${icon}</span>${label}
     </button>`;
 
@@ -6744,10 +6834,10 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
   const canGoUp = focus !== rootTree;
   const center = `
     <g style="cursor:${canGoUp ? 'pointer' : 'default'};" ${canGoUp ? `onclick="_svZoomOut()"` : ''}>
-      <circle cx="${cx}" cy="${cy}" r="${innerRadius - 4}" fill="#fff" stroke="${canGoUp ? '#6366f1' : '#e2e8f0'}" stroke-width="${canGoUp ? '2' : '1.5'}"/>
-      <text x="${cx}" y="${cy - 22}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:10.5px;fill:#64748b;text-transform:uppercase;letter-spacing:.05em;pointer-events:none;">${canGoUp ? '← back' : 'site'}</text>
+      <circle cx="${cx}" cy="${cy}" r="${innerRadius - 4}" fill="#fff" stroke="${canGoUp ? '#0a5bc4' : '#d6dbe0'}" stroke-width="${canGoUp ? '2' : '1.5'}"/>
+      <text x="${cx}" y="${cy - 22}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:12px;fill:#64748b;pointer-events:none;">${canGoUp ? '← back' : 'site'}</text>
       <text x="${cx}" y="${cy - 4}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:${focusLabel.length > 14 ? 13 : 17}px;font-weight:700;fill:#0f172a;pointer-events:none;">${_scEsc(focusLabel.length > 18 ? focusLabel.slice(0, 17) + '…' : focusLabel)}</text>
-      <text x="${cx}" y="${cy + 18}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:13px;font-weight:600;fill:#6366f1;pointer-events:none;">${focus.count} URL${focus.count===1?'':'s'}</text>
+      <text x="${cx}" y="${cy + 18}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:13px;font-weight:600;fill:var(--accent);pointer-events:none;">${focus.count} URL${focus.count===1?'':'s'}</text>
       ${focus.errors ? `<text x="${cx}" y="${cy + 36}" text-anchor="middle" style="font-family:ui-sans-serif,system-ui;font-size:10.5px;font-weight:600;fill:#ef4444;pointer-events:none;">${focus.errors} broken</text>` : ''}
     </g>`;
 
@@ -6761,7 +6851,7 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
     return items.map((it, i) => {
       const isLast = i === items.length - 1;
       return `<button type="button" onclick="_svZoomTo(${jsArg(it.path)})"
-        style="background:${isLast?'#6366f1':'#fff'};color:${isLast?'#fff':'#0f172a'};border:1px solid ${isLast?'#6366f1':'#e2e8f0'};border-radius:5px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;">${_scEsc(it.name)}</button>`;
+        style="background:${isLast?'var(--accent)':'#fff'};color:${isLast?'#fff':'#0f172a'};border:1px solid ${isLast?'var(--accent)':'#e2e8f0'};border-radius:5px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;">${_scEsc(it.name)}</button>`;
     }).join('<span style="color:#94a3b8;font-size:11px;align-self:center;">›</span>');
   };
 
@@ -6801,9 +6891,9 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
               click slice to drill · centre to go back · drag to pan · scroll to zoom
             </div>
             <div style="position:absolute;top:14px;right:14px;display:flex;flex-direction:column;gap:5px;z-index:2;">
-              <button type="button" onclick="_svZoom(1.25)" title="Zoom in" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#6366f1'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">+</button>
-              <button type="button" onclick="_svZoom(0.8)" title="Zoom out" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#6366f1'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">−</button>
-              <button type="button" onclick="_svResetView()" title="Reset zoom & position" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#6366f1'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">⟲</button>
+              <button type="button" onclick="_svZoom(1.25)" title="Zoom in" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">+</button>
+              <button type="button" onclick="_svZoom(0.8)" title="Zoom out" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">−</button>
+              <button type="button" onclick="_svResetView()" title="Reset zoom & position" style="width:30px;height:30px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;color:#0f172a;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;font-family:inherit;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#0f172a'">⟲</button>
             </div>
             <svg id="sv-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
                  data-vb-w="${W}" data-vb-h="${H}"
@@ -6813,7 +6903,7 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
             </svg>
           </div>
           <div style="margin-top:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:11.5px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:.05em;">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:11.5px;font-weight:600;color:#0f172a;">
               <span>Pages in this view</span>
               <span id="sv-list-count" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:2px 9px;font-size:10.5px;color:#64748b;font-weight:600;letter-spacing:0;text-transform:none;">${focusUrls.length}</span>
               <span style="margin-left:auto;font-weight:500;font-size:10.5px;color:#64748b;text-transform:none;letter-spacing:0;">click any URL to open in dock · ⇧-click to filter table</span>
@@ -6825,8 +6915,8 @@ function _scRenderSiteStructureSunburst(rootTree, results) {
         </div>
         <div style="min-width:0;overflow:hidden;">
           <div id="sv-readout" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;min-height:120px;overflow:hidden;">
-            <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:6px;">hover a slice</div>
-            <div id="sv-readout-path" style="font-family:'SF Mono','Menlo',monospace;font-size:12px;color:#6366f1;word-break:break-all;overflow-wrap:anywhere;margin-bottom:8px;max-width:100%;">-</div>
+            <div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:6px;">hover a slice</div>
+            <div id="sv-readout-path" style="font-family:'SF Mono','Menlo',monospace;font-size:12px;color:var(--accent);word-break:break-all;overflow-wrap:anywhere;margin-bottom:8px;max-width:100%;">-</div>
             <div id="sv-readout-stats" style="font-size:11.5px;color:#64748b;line-height:1.55;">Click a slice to drill in. Hold <kbd style="font-family:inherit;background:#fff;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;font-size:10.5px;">Shift</kbd> while clicking to filter the table to that subtree instead.</div>
           </div>
           <div style="font-size:11px;color:#64748b;line-height:1.55;">
@@ -6862,7 +6952,7 @@ function _svRenderList(pages, filter) {
       onmouseover="this.style.background='#fff'" onmouseout="this.style.background=''"
       title="${_scEsc(title || url)}">
       <span style="color:${sc};font-weight:700;width:38px;flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums;">${status || '-'}</span>
-      <span style="flex:1;min-width:0;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_scEsc(path)}</span>
+      <span style="flex:1;min-width:0;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_scEsc(path)}</span>
       ${issues ? `<span style="color:#f59e0b;font-size:10.5px;font-weight:600;flex-shrink:0;">${issues} issue${issues===1?'':'s'}</span>` : ''}
     </div>`;
   }).join('');
@@ -7092,7 +7182,7 @@ function _scRenderSiteStructureTree(root) {
            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"
            ${hasKids ? `onclick="document.getElementById('${rowId}').style.display=document.getElementById('${rowId}').style.display==='none'?'':'none';this.querySelector('.sv-caret').textContent=this.querySelector('.sv-caret').textContent==='▸'?'▾':'▸'"` : ''}>
         <span class="sv-caret" style="width:12px;font-size:10px;color:#94a3b8;text-align:center;">${hasKids ? (initiallyOpen ? '▾' : '▸') : '·'}</span>
-        <span style="font-family:'SF Mono','Menlo',monospace;font-size:12.5px;color:${leaf?'#6366f1':'#64748b'};font-weight:${leaf?600:400};">${label || '/'}</span>
+        <span style="font-family:'SF Mono','Menlo',monospace;font-size:12.5px;color:${leaf?'var(--accent)':'#64748b'};font-weight:${leaf?600:400};">${label || '/'}</span>
         ${leaf ? `<span style="font-family:'SF Mono','Menlo',monospace;font-size:10.5px;color:${statusColor};">${statusText}</span>` : `<span style="font-family:'SF Mono','Menlo',monospace;font-size:10.5px;color:#94a3b8;">${statusText}</span>`}
         ${issueCount ? `<span style="font-size:10.5px;color:#f59e0b;">${issueCount} issue${issueCount>1?'s':''}</span>` : ''}
         <span style="margin-left:auto;font-family:'SF Mono','Menlo',monospace;font-size:10px;color:#94a3b8;">${node.count} URL${node.count>1?'s':''}</span>
@@ -7135,7 +7225,7 @@ function _scRenderAnchorTextCloud() {
   }
   const max = items[0].count;
   const min = items[items.length - 1].count;
-  const palette = ['#0ea5e9', '#22c55e', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6', '#6366f1'];
+  const palette = ['#0ea5e9', '#22c55e', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6', 'var(--accent)'];
   const _scEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   // Count generic occurrences for the banner.
@@ -7157,7 +7247,7 @@ function _scRenderAnchorTextCloud() {
       ? `${safe}: generic anchor (${it.count}×). Google can't tell what the linked page is about. Rewrite to describe the destination topic.`
       : `${safe}: used ${it.count} time${it.count===1?'':'s'} pointing to ${it.targets.size} URL${it.targets.size===1?'':'s'}`;
     const extra = isGeneric ? `border:1px solid rgba(220,38,38,0.4);background:rgba(254,226,226,0.6);` : '';
-    const badge = isGeneric ? `<span style="margin-left:5px;font-size:9.5px;font-weight:700;color:#fff;background:#dc2626;padding:1px 5px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase;">⚠</span>` : '';
+    const badge = isGeneric ? `<span style="margin-left:5px;font-size:12px;font-weight:600;color:#fff;background:#dc2626;padding:1px 5px;border-radius:8px;">⚠</span>` : '';
     return `<span class="sv-cloud-tag" style="display:inline-block;padding:5px 10px;font-size:${fontSize}px;font-weight:${500 + Math.round(ratio*300)};color:${color};opacity:${opacity};line-height:1.25;cursor:pointer;border-radius:6px;transition:background .12s,opacity .12s;${extra}"
         onmouseover="this.style.background='#f1f5f9';this.style.opacity='1';"
         onmouseout="this.style.background='${isGeneric ? 'rgba(254,226,226,0.6)' : ''}';this.style.opacity='${opacity}';"
