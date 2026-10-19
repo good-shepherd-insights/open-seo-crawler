@@ -2648,6 +2648,7 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
             if base_href:
                 link_base = urljoin(link_base, base_href)
         int_links = {}      # normalized target -> {anchor, placement}
+        int_links_copy = {} # same, the first body-copy link to a target whose first link sat in nav/header/footer
         ext_links_list = [] # external links captured with anchor + placement
         ext_count = 0
         for a in soup.find_all('a', href=True):
@@ -2725,6 +2726,13 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
                 normalized = _normalize_crawl_url(resolved)
                 if normalized not in int_links:
                     int_links[normalized] = (anchor, placement)
+                elif (placement in ('main', 'body') and normalized not in int_links_copy
+                      and int_links[normalized][1] not in ('main', 'body')):
+                    # The first link to a target wins, and on most sites that
+                    # is the menu, so a link to the same page in the copy
+                    # vanished: every page the menu lists showed no in-content
+                    # links at all. Keep the first copy link too.
+                    int_links_copy[normalized] = (anchor, placement)
             else:
                 ext_count += 1
                 if len(ext_links_list) < 300:  # cap payload
@@ -2763,7 +2771,8 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
             result['js_click_links'] = _js_click_int
             result['issues'].append(f'JS-only navigation: {_js_click_int} internal link(s) have no <a href> (search engines cannot follow them)')
 
-        result['internal_link_urls'] = [[t, a, p] for t, (a, p) in int_links.items()]
+        result['internal_link_urls'] = ([[t, a, p] for t, (a, p) in int_links.items()]
+                                        + [[t, a, p] for t, (a, p) in int_links_copy.items()])
         result['internal_links'] = len(int_links)
         result['external_link_urls'] = ext_links_list
         result['external_links'] = ext_count
