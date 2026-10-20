@@ -2620,20 +2620,39 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         # Links - extract internal + external with anchor text + placement.
         # Placement = which site region the link sits in (nav / header / footer / main),
         # so users can tell boilerplate links from content links — like Screaming Frog.
+        # Class hints match whole words, and the walk stops at <body>: body and
+        # html classes are page settings, not regions (Divi puts et-tb-has-footer
+        # on every page, so a substring match labelled every copy link footer).
+        # Divi module classes (et_pb_*) name the module type, e.g. the page hero
+        # et_pb_fullwidth_header, so they are not region hints either.
+        _NAV_STARTS = ('navbar', 'navigation', 'navmenu', 'navlink', 'navitem', 'navwrap', 'navlist')
+
+        def _class_region(class_list):
+            if isinstance(class_list, str): class_list = class_list.split()
+            words = set()
+            for c in class_list:
+                c = c.lower()
+                if c.startswith('et_pb_'): continue
+                words.update(_re.findall(r'[a-z0-9]+', c))
+            if any(w == 'nav' or w.endswith('nav') or w.startswith(_NAV_STARTS) for w in words): return 'nav'
+            if any(w.startswith('footer') or w.endswith('footer') for w in words): return 'footer'
+            if any(w.startswith('header') or w.endswith('header') for w in words): return 'header'
+            return None
+
         def _placement(a_tag):
             for ancestor in a_tag.parents:
                 name = (getattr(ancestor, 'name', None) or '').lower()
                 if not name: continue
+                if name in ('body', 'html', '[document]'): break
                 if name in ('nav',): return 'nav'
                 if name in ('header',): return 'header'
                 if name in ('footer',): return 'footer'
                 if name in ('aside',): return 'sidebar'
                 # Check role / class hints
-                classes = ' '.join(ancestor.get('class', []) if hasattr(ancestor, 'get') else []).lower()
                 role = (ancestor.get('role', '') if hasattr(ancestor, 'get') else '').lower()
-                if 'nav' in classes or role == 'navigation': return 'nav'
-                if 'footer' in classes: return 'footer'
-                if 'header' in classes: return 'header'
+                if role == 'navigation': return 'nav'
+                region = _class_region(ancestor.get('class', []) if hasattr(ancestor, 'get') else [])
+                if region: return region
                 if name == 'main': return 'main'
             return 'body'
 

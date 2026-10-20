@@ -241,6 +241,18 @@ check('a bare query key is fetched as written, not rewritten to key=',
       and any(r.get('url') == BASE + '/services/?view' for r in rows))
 check('the URL normaliser keeps a bare key and still drops utm',
       crawler._normalize_crawl_url(BASE + '/p/?et_blog&utm_source=x&b=1') == BASE + '/p/?et_blog&b=1')
+# /placement/: body classes name a header, a footer and a nav; none of them is a region.
+_pl_row = by_url.get(_key(BASE + '/placement/')) or {}
+_pl = {_key(t): p for t, _a, p in (_pl_row.get('internal_link_urls') or [])}
+check(f'a copy link is copy although the body class names a footer (got {_pl.get(_key(BASE + "/clean-second/"))})',
+      _pl.get(_key(BASE + '/clean-second/')) in ('body', 'main'))
+check(f'a class word like navy is not a nav (got {_pl.get(_key(BASE + "/dead-end/"))})',
+      _pl.get(_key(BASE + '/dead-end/')) in ('body', 'main'))
+check(f'a Divi hero module is not the site header (got {_pl.get(_key(BASE + "/blog/"))})',
+      _pl.get(_key(BASE + '/blog/')) in ('body', 'main'))
+check('real regions keep their label: nav tag, footer and theme builder header classes',
+      _pl.get(_key(BASE + '/about/')) == 'nav' and _pl.get(_key(BASE + '/lorem/')) == 'footer'
+      and _pl.get(_key(BASE + '/accents/')) == 'header')
 check('a canonical naming a noindex page is found',
       fires('/canonical-to-noindex', 'canonical points to a non-indexable'))
 check('a page with no outgoing links is found',

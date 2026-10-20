@@ -87,6 +87,7 @@ def build(base='http://127.0.0.1:8099'):
         '<a href="/gone/">A page that 404s</a> '
         '<a href="/old-url/">A page that redirects</a> '
         '<a href="/redirect-links/">Links to redirects</a> '
+        '<a href="/placement/">Link placement</a> '
         '<a href="/noindex-target/">A noindex page</a> '
         '<a href="/accents/">Accented title</a> '
         # Bot readability pages: serve.py answers some crawler user agents
@@ -198,6 +199,22 @@ def build(base='http://127.0.0.1:8099'):
         '<a href="/moved/">A page that moved</a> '
         '<a href="/services/?view">Services with a bare parameter</a></p>',
         head=f'<title>Links to redirects</title><meta name="description" content="A page whose links point at URLs that redirect to pages the crawl reaches through the navigation anyway.">{canonical(base + "/redirect-links/")}'))
+    # Link placement. The body carries page-setting classes that name no
+    # region (a Divi page has et-tb-has-footer, other themes et_fixed_nav or
+    # has-header-image); a crawler that reads them labels every copy link footer
+    # or nav. Copy links must read as copy, real regions keep their label.
+    write('/placement/', '<!doctype html><html lang="en-AU"><head><meta charset="utf-8">'
+          '<title>Link placement</title>'
+          '<meta name="description" content="Copy links on a page whose body classes mention a header, a footer and a nav, plus links in real regions.">'
+          f'{canonical(base + "/placement/")}</head>'
+          '<body class="et-tb-has-header et-tb-has-footer et_fixed_nav has-header-image">'
+          f'{NAV}<div id="main-content"><h1>Link placement</h1><p>' + ('Copy here. ' * 40) + '</p>'
+          '<p>Read <a href="/clean-second/">the second clean page</a> in the copy.</p>'
+          '<div class="panel bg-navy"><p><a href="/dead-end/">A link on a navy panel</a></p></div>'
+          '<section class="et_pb_fullwidth_header"><a href="/blog/">A hero button</a></section></div>'
+          '<div class="site-footer"><a href="/lorem/">A footer link</a></div>'
+          '<div class="et-l et-l--header"><a href="/accents/">A theme builder header link</a></div>'
+          '</body></html>')
     write('/search/', page(
         f'{NAV}<h1>Search results</h1><p>' + ('Results would appear here. ' * 40) + '</p>',
         head=f'<title>Search results</title><meta name="description" content="An internal search results page, which is thin, infinite in number, and has no business being indexed.">{canonical(base + "/search/")}'))
