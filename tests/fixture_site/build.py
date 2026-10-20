@@ -86,6 +86,7 @@ def build(base='http://127.0.0.1:8099'):
         # checks have nothing to compare a canonical against.
         '<a href="/gone/">A page that 404s</a> '
         '<a href="/old-url/">A page that redirects</a> '
+        '<a href="/redirect-links/">Links to redirects</a> '
         '<a href="/noindex-target/">A noindex page</a> '
         '<a href="/accents/">Accented title</a> '
         # Bot readability pages: serve.py answers some crawler user agents
@@ -187,6 +188,16 @@ def build(base='http://127.0.0.1:8099'):
     write('/redirect-target/', page(
         f'{NAV}<h1>Redirect target</h1><p>' + ('Copy here. ' * 40) + '</p>',
         head=f'<title>Redirect target</title><meta name="description" content="The destination of the fixture redirect, linked from nowhere so the redirecting row survives the crawl.">{canonical(base + "/redirect-target/")}'))
+    # Links that only redirect, each to a page the crawl reaches anyway: /about
+    # 301s to /about/ (its slash twin, linked from the nav), /moved/ 301s to
+    # /services/. A crawler that drops a redirect landing on a page it holds,
+    # or never fetches a slash twin, reports neither.
+    write('/redirect-links/', page(
+        f'{NAV}<h1>Links to redirects</h1><p>' + ('Copy here. ' * 40) + '</p>'
+        '<p><a href="/about">About, written without the slash</a> '
+        '<a href="/moved/">A page that moved</a> '
+        '<a href="/services/?view">Services with a bare parameter</a></p>',
+        head=f'<title>Links to redirects</title><meta name="description" content="A page whose links point at URLs that redirect to pages the crawl reaches through the navigation anyway.">{canonical(base + "/redirect-links/")}'))
     write('/search/', page(
         f'{NAV}<h1>Search results</h1><p>' + ('Results would appear here. ' * 40) + '</p>',
         head=f'<title>Search results</title><meta name="description" content="An internal search results page, which is thin, infinite in number, and has no business being indexed.">{canonical(base + "/search/")}'))

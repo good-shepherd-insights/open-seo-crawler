@@ -212,6 +212,35 @@ check('a page reached only through a redirect still gets the content checks',
       fires('/redirect-target/', 'title too short'))
 check('a canonical naming a redirect is found',
       fires('/canonical-to-redirect', 'canonical points to a url that redirects'))
+
+# /redirect-links/ links /about (301 to /about/, which the nav links) and
+# /moved/ (301 to /services/). Both land on pages the crawl holds anyway. The
+# redirect is either its own row (url = where it starts) or, when it was
+# fetched before the page it lands on, the landing row's original_url.
+
+
+def _redirect_from(path):
+    want = BASE + path
+    return next((r for r in rows if r.get('redirect_status') == 301
+                 and want in (r.get('url'), r.get('original_url'))
+                 and r.get('redirect_url') not in (None, want)), None)
+
+
+_about_rd, _moved_rd = _redirect_from('/about'), _redirect_from('/moved/')
+check('a link to a slash twin that redirects is reported',
+      bool(_about_rd) and _about_rd.get('redirect_url') == BASE + '/about/')
+check('a redirect landing on a page the crawl already holds is reported',
+      bool(_moved_rd) and _moved_rd.get('redirect_url') == BASE + '/services/')
+check('redirects are counted as 3xx',
+      (((complete or {}).get('reports') or {}).get('response_codes') or {}).get('3xx', 0) >= 1)
+check('a page reached directly and through a redirect keeps one row',
+      sum(1 for r in rows if r.get('url') == BASE + '/services/') == 1
+      and sum(1 for r in rows if r.get('url') == BASE + '/about/') == 1)
+check('a bare query key is fetched as written, not rewritten to key=',
+      not any(str(r.get(k) or '').endswith('?view=') for r in rows for k in ('url', 'original_url'))
+      and any(r.get('url') == BASE + '/services/?view' for r in rows))
+check('the URL normaliser keeps a bare key and still drops utm',
+      crawler._normalize_crawl_url(BASE + '/p/?et_blog&utm_source=x&b=1') == BASE + '/p/?et_blog&b=1')
 check('a canonical naming a noindex page is found',
       fires('/canonical-to-noindex', 'canonical points to a non-indexable'))
 check('a page with no outgoing links is found',
@@ -286,6 +315,8 @@ check('a page the sitemap lists is not called missing',
       not in_report('missing_from_sitemap', '/about/'))
 check('a linked page in the sitemap is not called an orphan',
       not in_report('orphan_in_sitemap', '/about/'))
+check('a redirect row never stands in for its slash twin in the sitemap check',
+      not in_report('non_200_in_sitemap', '/about/') and not in_report('redirects_in_sitemap', '/about/'))
 
 # ── the raw-HTML parser behind the JS vs non-JS diff ─────────────────────────
 _nojs = crawler._parse_no_js_subset(

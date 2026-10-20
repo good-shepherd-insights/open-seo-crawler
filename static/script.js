@@ -48,6 +48,7 @@ function _scLookupInlinks(url) {
 // not where it ended up stands for the redirect source. Same test as
 // _is_redirect_source in app.py.
 function _scIsRedirectSource(r) {
+  if (r && r.redirect_only) return true;
   if (!r || !r.redirect_url) return false;
   const n = (u) => String(u || '').trim().toLowerCase()
     .replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/(%20|\s|\/)+$/, '');
@@ -1250,6 +1251,9 @@ function startCrawl(opts) {
                 const _lnorm = (u) => (u || '').replace(/\/$/, '');
                 const _lrows = new Map();
                 for (const r of (crawlerResults || [])) {{
+                  // A redirect_only row (/about -> /about/) shares the page's
+                  // key: it never takes the page's late issues.
+                  if (r.redirect_only) {{ if (!_lrows.has(_lnorm(r.url))) _lrows.set(_lnorm(r.url), r); continue; }}
                   _lrows.set(_lnorm(r.url), r);
                   if (r.original_url) _lrows.set(_lnorm(r.original_url), r);
                 }}

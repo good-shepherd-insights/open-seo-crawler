@@ -18,7 +18,9 @@ SITE = os.path.join(HERE, 'site')
 
 # path -> (status, location). These are the faults a static file cannot carry.
 REDIRECTS = {'/old-url/': (301, '/redirect-target/'),
-             '/old-url': (301, '/redirect-target/')}
+             '/old-url': (301, '/redirect-target/'),
+             # Lands on a page the nav links, so the crawl holds it already.
+             '/moved/': (301, '/services/')}
 GONE = {'/gone/', '/gone'}
 
 
@@ -67,9 +69,20 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         return False
 
+    def _bare_param_fault(self):
+        """/services/?view is linked; ?view= answers 301 back to it, as
+        WordPress does. A crawler that rewrites the bare key reports it."""
+        if not self.path.endswith('?view='):
+            return False
+        self.send_response(301)
+        self.send_header('Location', self.path[:-1])
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+        return True
+
     def do_GET(self):
         path = self.path.split('?')[0]
-        if self._bot_fault(path):
+        if self._bot_fault(path) or self._bare_param_fault():
             return
         if path in REDIRECTS:
             status, location = REDIRECTS[path]
@@ -86,6 +99,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         path = self.path.split('?')[0]
+        if self._bare_param_fault():
+            return
         if path in REDIRECTS:
             status, location = REDIRECTS[path]
             self.send_response(status)

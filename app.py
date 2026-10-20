@@ -1199,18 +1199,25 @@ def _normalize_crawl_url(url):
     Strips WooCommerce action endpoints (?add-to-cart=, ?wc-ajax= …) so
     every product page's "Add to cart" button doesn't surface as its own
     URL with no meta description.
+
+    The pairs that stay are kept exactly as written. Re-encoding them through
+    parse_qs + urlencode turned a bare ``?et_blog`` into ``?et_blog=``, and
+    WordPress 301s that back, so the crawl reported a redirect the site never
+    links to.
     """
-    from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+    from urllib.parse import urlparse, urlunparse, unquote_plus
     parsed = urlparse(url)
     path = parsed.path or '/'
     if parsed.query:
-        params = parse_qs(parsed.query, keep_blank_values=True)
-        cleaned = {
-            k: v for k, v in params.items()
-            if not k.lower().startswith('utm_')
-            and k.lower() not in _CRAWL_NOISE_PARAMS
-        }
-        query = urlencode(cleaned, doseq=True)
+        kept = []
+        for pair in parsed.query.split('&'):
+            if not pair:
+                continue
+            k = unquote_plus(pair.split('=', 1)[0]).lower()
+            if k.startswith('utm_') or k in _CRAWL_NOISE_PARAMS:
+                continue
+            kept.append(pair)
+        query = '&'.join(kept)
     else:
         query = ''
     return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, '', query, ''))
@@ -3238,8 +3245,45 @@ def _is_redirect_source(r):
     started). So redirect_url alone does not make a row a redirect: that row is
     the landing page, often the start page itself (example.com -> www).
     """
+    if r.get('redirect_only'):
+        return True
     rd = r.get('redirect_url')
     return bool(rd) and _norm_url(rd) != _norm_url(r.get('url') or '')
+
+
+_REDIRECT_ISSUE_RE = _re.compile(r'redirect \(\d+ hops?\)$', _re.I)
+
+
+def _redirect_only_row(requested_url, landed):
+    """A row for a URL that only redirects to a page the crawl already holds.
+
+    The landing page has its own row, so this one carries no content: the
+    requested URL, its 3xx, where it goes and the redirect issue. Pages that
+    link to it find it through the inlinks keyed under requested_url, and the
+    Redirects view lists it, so a link to /about that 301s to /about/ shows up
+    whichever of the two the crawl reached first.
+    """
+    chain = landed.get('redirect_chain') or []
+    status = landed.get('redirect_status') or (chain[0].get('status') if chain else None) or 301
+    return {
+        'url': requested_url, 'status_code': status, 'content_type': '', 'last_modified': '',
+        'response_time': landed.get('response_time', 0),
+        'title': '', 'title_len': 0, 'meta_description': '', 'meta_len': 0,
+        'h1': '', 'h1_list': [], 'h2_list': [], 'h2_count': 0,
+        'canonical': '', 'canonical_match': False, 'canonical_kind': None,
+        'word_count': 0, 'internal_links': 0, 'external_links': 0,
+        'internal_link_urls': [], 'external_link_urls': [], 'images_total': 0, 'images_no_alt': 0,
+        # indexable speaks for noindex only, as on 404 rows; the status says the rest.
+        'schema_types': [], 'indexable': True, 'is_pagination': False,
+        'issues': [i for i in (landed.get('issues') or []) if _REDIRECT_ISSUE_RE.search(str(i))],
+        'error': None, 'depth': landed.get('depth', 0),
+        'redirect_url': landed.get('url'), 'redirect_kind': landed.get('redirect_kind'),
+        'redirect_status': status, 'redirect_hops': landed.get('redirect_hops') or len(chain[:-1]) or 1,
+        'redirect_chain': chain, 'redirect_only': True,
+        'body_hash': '', 'security': {}, 'mixed_content': [],
+        'url_issues': landed.get('url_issues') or [], 'hreflang': [], 'x_robots_tag': '',
+        'og_tags': {}, 'twitter_tags': {}, 'analytics': [], 'retries': landed.get('retries', 0),
+    }
 
 
 @app.route('/fetch-robots-txt', methods=['GET'])
@@ -3365,6 +3409,11 @@ def sitemap_analyse():
     for r in results:
         u = r.get('url')
         if not u:
+            continue
+        # A redirect_only row (/about -> /about/) normalises to its target's
+        # key; it may fill an empty slot but never displaces the page's row.
+        if r.get('redirect_only'):
+            crawl_by_norm.setdefault(_norm_url(u), r)
             continue
         crawl_by_norm[_norm_url(u)] = r
         ou = r.get('original_url')
@@ -4473,6 +4522,9 @@ def crawl_site():
             inlinks_map = dict(resumed_state.get('inlinks_map', {}))
             inlink_seen = {(t, e.get('source'), e.get('anchor'), e.get('placement'))
                            for t, bucket in inlinks_map.items() for e in bucket}
+            recorded = {r.get('url') for r in results if r.get('url')}
+            queued_exact = set(resumed_state.get('queued_exact') or ()) | recorded | {u for u, _d in queue}
+            slash_probes = set(resumed_state.get('slash_probes') or ())
             yield f"data: {json.dumps({'type': 'resumed', 'previous_pages': len(results), 'queued': len(queue), 'errors': errors})}\n\n"
         else:
             queue = deque()
@@ -4495,6 +4547,15 @@ def crawl_site():
             # put thousands of entries in the same buckets, and 4,000 pages
             # cost close to a minute of CPU in this one loop.
             inlink_seen = set()
+            # URLs that have a row. A redirect can land on a page that is also
+            # queued under its own URL; without this both fetches got a row.
+            recorded = set()
+            # URLs put on the queue as written. `visited` also holds each one's
+            # slash twin, so a link to /about was never fetched once /about/
+            # was queued, and its 301 never reached the report.
+            queued_exact = {_seed_norm}
+            # Slash twins queued only to see whether they redirect.
+            slash_probes = set()
 
         tracked_kws = []  # left in place for payload compatibility; no external data sources in the public build
         yield f"data: {json.dumps({'type': 'start', 'domain': domain, 'workers': max_workers, 'crawl_id': crawl_id})}\n\n"
@@ -4703,10 +4764,26 @@ def crawl_site():
                             _alt = _crawl_slash_alt(canonical_url)
                             if _alt:
                                 visited.add(_alt)
-                            if any(r.get('url') == canonical_url for r in results):
+                            # The page it lands on already has a row (reached
+                            # through a link before this redirect resolved). It
+                            # used to be dropped here, which hid every internal
+                            # link to a redirect whose target was crawled first.
+                            # Keep the redirect itself, without the page.
+                            if canonical_url in recorded:
+                                page_data = _redirect_only_row(url, page_data)
+                                link_urls = []
+                        elif canonical_url:
+                            # A URL fetched as itself. Skip it when a redirect
+                            # already landed on it, or when it is a slash twin
+                            # that answered 200 next to a twin already held:
+                            # the same page under two spellings, as before.
+                            _alt = _crawl_slash_alt(canonical_url)
+                            if canonical_url in recorded or (
+                                    _alt in recorded and (canonical_url in slash_probes or _alt in slash_probes)):
                                 continue
 
                         results.append(page_data)
+                        recorded.add(page_data.get('url'))
                         if page_data.get('error'):
                             errors += 1
                         total_time += page_data.get('response_time', 0)
@@ -4733,6 +4810,14 @@ def crawl_site():
                                 visited.add(link)
                                 if alt:
                                     visited.add(alt)
+                                queued_exact.add(link)
+                                queue.append((link, depth + 1))
+                            elif (alt and link in visited and link not in queued_exact
+                                  and link not in recorded and _url_allowed(link)):
+                                # Linked as written but only its slash twin was
+                                # queued: fetch it once to see if it redirects.
+                                queued_exact.add(link)
+                                slash_probes.add(link)
                                 queue.append((link, depth + 1))
 
                         # Hreflang discovery — region/language alternates are often
@@ -4754,6 +4839,7 @@ def crawl_site():
                                 visited.add(_href)
                                 if _halt:
                                     visited.add(_halt)
+                                queued_exact.add(_href)
                                 queue.append((_href, depth + 1))
 
                         # Site-level robots.txt findings ride on the homepage row
@@ -4817,6 +4903,8 @@ def crawl_site():
                 'domain': domain,
                 'queue': list(queue),
                 'visited': list(visited),
+                'queued_exact': list(queued_exact),
+                'slash_probes': list(slash_probes),
                 'results': results,
                 'inlinks_map': inlinks_map,
                 'errors': errors,
