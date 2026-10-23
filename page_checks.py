@@ -101,6 +101,62 @@ def text_px(text, size):
     return round(total * size / 1000)
 
 
+def _blank(m):
+    return ' ' * len(m.group(0))
+
+
+def _mask_raw_text(raw_html):
+    """Raw HTML with comments, scripts and styles blanked to spaces.
+
+    A "<div>" or "<title>" inside a script string or a comment is not a tag.
+    Offsets are kept, so a position in the result is a position in the input.
+    """
+    s = re.sub(r'<!--.*?-->', _blank, raw_html or '', flags=re.S)
+    return re.sub(r'<(script|style)(?=[\s/>])[^>]*>.*?</\1\s*>', _blank, s,
+                  flags=re.S | re.I)
+
+
+# Subtrees that are never the page's own markup. A <template> is an inert
+# fragment until script clones it, and <svg>/<math> are foreign content where
+# <title> is the graphic's accessible name (icon sprites, payment badges,
+# chart points), not the document title. They can nest, so they are matched
+# open to close by depth rather than by a lazy regex.
+_INERT_SUBTREES = ('template', 'svg', 'math')
+_INERT_TAG_RE = re.compile(r'<(/?)(template|svg|math)(?=[\s/>])[^>]*?(/?)>', re.I)
+
+
+def _mask_inert(raw_html):
+    """``_mask_raw_text`` plus every template, svg and math subtree blanked.
+
+    An element that never closes is left as it is: hiding the rest of the page
+    would hide a real stray tag too.
+    """
+    s = _mask_raw_text(raw_html)
+    spans = []
+    outer, depth, start = None, 0, 0
+    for m in _INERT_TAG_RE.finditer(s):
+        closing, name, selfclose = m.group(1), m.group(2).lower(), m.group(3)
+        if outer is None:
+            if not closing and not selfclose:
+                outer, depth, start = name, 1, m.start()
+            continue
+        if name != outer or selfclose:
+            continue
+        depth += -1 if closing else 1
+        if depth == 0:
+            spans.append((start, m.end()))
+            outer = None
+    if not spans:
+        return s
+    parts, prev = [], 0
+    for a, b in spans:
+        parts.append(s[prev:a])
+        parts.append(' ' * (b - a))
+        prev = b
+    parts.append(s[prev:])
+    return ''.join(parts)
+
+
 def _head_cut(raw_html):
     """Byte offset where a browser closes <head>, or None when it runs to </head>.
 
@@ -113,10 +169,9 @@ def _head_cut(raw_html):
     start = head_open.end() if head_open else 0
     end_m = re.search(r'</head\s*>', raw_html, re.I)
     end = end_m.start() if end_m else len(raw_html)
-    # Blank out comments so a commented-out <div> cannot close the head.
-    region = raw_html[start:end]
-    region = re.sub(r'<!--.*?-->', lambda m: ' ' * len(m.group(0)), region,
-                    flags=re.S)
+    # Blank out comments, scripts and styles so a commented-out <div>, or one
+    # inside a script string, cannot close the head.
+    region = _mask_raw_text(raw_html[start:end])
     for m in re.finditer(r'<(/?)([a-zA-Z][a-zA-Z0-9-]*)', region):
         if m.group(1):          # a closing tag never opens body content
             continue
@@ -147,11 +202,16 @@ def _http_date_past(value):
 
 
 def head_issues(raw_html):
-    """Directives a browser would move out of <head>, so Google ignores them."""
+    """Directives a browser would move out of <head>, so Google ignores them.
+
+    Searched in the masked HTML: an SVG icon's <title> in the footer, or a
+    canonical inside a script string or a <template>, is not a stray tag.
+    """
     out = []
     cut = _head_cut(raw_html)
     if cut is None:
         return out
+    masked = _mask_inert(raw_html)
     checks = (
         (r'<title[\s>]', 'Title'),
         (r'<link[^>]+rel\s*=\s*["\']?canonical', 'Canonical'),
@@ -160,7 +220,7 @@ def head_issues(raw_html):
         (r'<link[^>]+hreflang\s*=', 'Hreflang'),
     )
     for pattern, label in checks:
-        hits = [p for p in _positions(raw_html, pattern) if p > cut]
+        hits = [p for p in _positions(masked, pattern) if p > cut]
         if hits:
             out.append(f'{label} outside head (Google ignores it)')
     return out
@@ -170,8 +230,10 @@ def duplicate_tag_issues(soup):
     """More than one of a tag that may only appear once."""
     out = []
     # An inline SVG's <title> is its accessible name (chart tooltips, icons),
-    # not a page title: a page with 30 chart points was called 31 titles.
-    titles = [t for t in soup.find_all('title') if not t.find_parent('svg')]
+    # not a page title: a page with 30 chart points was called 31 titles. A
+    # <template> is inert markup, and html.parser keeps its children as tags.
+    titles = [t for t in soup.find_all('title')
+              if not t.find_parent(_INERT_SUBTREES)]
     if len(titles) > 1:
         out.append(f'Multiple title tags ({len(titles)})')
     cans = soup.find_all('link', attrs={'rel': 'canonical'})
@@ -438,6 +500,28 @@ def lang_issues(soup, result):
     return out
 
 
+def _outside_outline(tag):
+    """True for a heading no reader meets in the page's own outline.
+
+    A modal dialog (a theme's quick-view or cart drawer, often rendered ahead
+    of the main content), an inert <template>, and anything carrying hidden or
+    aria-hidden="true". A dialog's headings start their own outline at H2 by
+    design, so counting them made product pages "start at H2".
+    """
+    for node in [tag, *tag.parents]:
+        name = getattr(node, 'name', None)
+        if name in ('template', 'dialog'):
+            return True
+        attrs = getattr(node, 'attrs', None) or {}
+        if str(attrs.get('role', '')).lower() in ('dialog', 'alertdialog'):
+            return True
+        if str(attrs.get('aria-modal', '')).lower() == 'true':
+            return True
+        if 'hidden' in attrs or str(attrs.get('aria-hidden', '')).lower() == 'true':
+            return True
+    return False
+
+
 def heading_issues(result, soup):
     """Heading faults past the missing and multiple H1 the crawler reports."""
     out = []
@@ -446,7 +530,7 @@ def heading_issues(result, soup):
         out.append(f'H1 too long ({len(h1)} chars)')
     levels = []
     for tag in soup.find_all(re.compile(r'^h[1-6]$', re.I)):
-        if tag.get_text(strip=True):
+        if tag.get_text(strip=True) and not _outside_outline(tag):
             levels.append(int(tag.name[1]))
     if levels:
         if levels[0] != 1:
@@ -553,6 +637,56 @@ def dom_issues(soup):
     if count > 1500:
         return [f'Large DOM ({count} elements)']
     return []
+
+
+def _img_path(src):
+    """An image URL reduced to its path, so ?width=800 and ?v=2 copies match."""
+    try:
+        return urlparse((src or '').strip()).path
+    except ValueError:
+        return ''
+
+
+def described_image_paths(imgs):
+    """Paths of the images that carry a real alt somewhere on the page."""
+    out = set()
+    for img in imgs:
+        if (img.get('alt') or '').strip():
+            path = _img_path(img.get('src') or img.get('data-src'))
+            if path:
+                out.add(path)
+    return out
+
+
+def _in_site_chrome(tag):
+    """True inside a <nav>, or a site-wide <header> or <footer>.
+
+    A header or footer inside an article, section, main or aside belongs to
+    that content (a post's header carries its featured image), so it is not
+    chrome.
+    """
+    for node in tag.parents:
+        name = getattr(node, 'name', None)
+        if name == 'nav':
+            return True
+        if name in ('header', 'footer'):
+            return node.find_parent(['article', 'section', 'main', 'aside']) is None
+    return False
+
+
+def empty_alt_not_content(img, described):
+    """True when an alt="" image is not content imagery left undescribed.
+
+    Two shapes that read as content to a filename test but are not:
+    a copy of an image the page already describes (slider clones, quick-view
+    and zoom copies, a hidden mobile duplicate), and an image in the site's
+    navigation, header or footer (mega-menu promo cards that sit next to
+    their own caption, payment badges).
+    """
+    path = _img_path(img.get('src') or img.get('data-src'))
+    if path and path in described:
+        return True
+    return _in_site_chrome(img)
 
 
 def image_issues(result):

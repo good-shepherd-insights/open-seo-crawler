@@ -253,6 +253,17 @@ check(f'a Divi hero module is not the site header (got {_pl.get(_key(BASE + "/bl
 check('real regions keep their label: nav tag, footer and theme builder header classes',
       _pl.get(_key(BASE + '/about/')) == 'nav' and _pl.get(_key(BASE + '/lorem/')) == 'footer'
       and _pl.get(_key(BASE + '/accents/')) == 'header')
+# /inert-markup/: SVG icon titles, a menu <template>, a script string and a
+# quick-view dialog are not faults; the lifestyle photo with alt="" is.
+check('crawled /inert-markup', issues('/inert-markup') is not None)
+check('SVG icon titles after an early head close are not "title outside head"',
+      quiet('/inert-markup', 'title outside head'))
+check('SVG and template titles are not multiple title tags',
+      quiet('/inert-markup', 'multiple title tags'))
+check('a quick-view dialog h2 ahead of main does not start the outline',
+      quiet('/inert-markup', 'first heading is h2'))
+check('only the undescribed lifestyle photo is empty-alt content imagery',
+      fires('/inert-markup', '1 imgs with empty alt on content imagery'))
 check('a canonical naming a noindex page is found',
       fires('/canonical-to-noindex', 'canonical points to a non-indexable'))
 check('a page with no outgoing links is found',

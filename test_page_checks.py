@@ -485,6 +485,89 @@ check('crawl_issues never raises on junk', pc.crawl_issues([], None) == {})
 check('crawl_issues ignores malformed rows', pc.crawl_issues([{}, None, 3]) == {})
 
 
+# --- inert markup is not a stray tag ------------------------------------------
+# A tracking pixel's <noscript><img> closes the head early, so everything after
+# it is "body" to the raw check. The footer's payment icons are inline SVGs
+# with <title> names, a mega menu sits in a <template>, and a script string
+# holds markup: none of those is a page title.
+PIXEL_HEAD = ('<!doctype html><html><head><meta charset="utf-8">'
+              '<title>Shop</title><link rel="canonical" href="https://example.com/">'
+              '<script>var t = "<title>in a string</title><div>";</script>'
+              '<noscript><img height="1" width="1" src="https://example.com/px"></noscript>'
+              '<meta name="x-verify" content="1"></head><body>')
+ICON_FOOTER = ('<footer><ul><li><svg role="img" aria-labelledby="pi-a"><title id="pi-a">Card A</title>'
+               '<path d="M0 0"/></svg></li><li><svg role="img"><title>Card B</title>'
+               '<svg><title>nested</title></svg><title>after nested</title></svg></li>'
+               '<li><svg viewBox="0 0 1 1"/><title>Real stray</title></li></ul></footer>')
+SPRITE_PAGE = (PIXEL_HEAD + '<template x-if="open"><nav><svg><title>Menu</title></svg>'
+               '<title>in template</title></template>'
+               '<h1>Hi</h1><svg-icon></svg-icon></body></html>')
+check('svg, template and script titles are not outside head',
+      pc.head_issues(PIXEL_HEAD + ICON_FOOTER.replace('<li><svg viewBox="0 0 1 1"/><title>Real stray</title></li>', '')
+                     + '</body></html>') == [])
+check('sprite inside template is not outside head', pc.head_issues(SPRITE_PAGE) == [])
+check('a real stray title after a self-closed svg is still caught',
+      has(pc.head_issues(PIXEL_HEAD + ICON_FOOTER + '</body></html>'), 'Title outside head'))
+check('a real stray title in body is still caught',
+      has(pc.head_issues(PIXEL_HEAD + '<div><title>Stray</title></div></body></html>'),
+          'Title outside head'))
+check('a custom element named svg-something is not an svg',
+      has(pc.head_issues(PIXEL_HEAD + '<svg-icon><title>Stray</title></svg-icon></body></html>'),
+          'Title outside head'))
+check('an svg that never closes hides nothing',
+      has(pc.head_issues(PIXEL_HEAD + '<svg><title>Stray</title></body></html>'),
+          'Title outside head'))
+check('a script string cannot close the head',
+      pc._head_cut('<head><script>var a = "<div>";</script><title>t</title></head>') is None)
+check('a canonical in a script string is not outside head', pc.head_issues(
+    PIXEL_HEAD + '<script>x = \'<link rel="canonical" href="/b">\'</script></body></html>') == [])
+check('the pixel still closes the head', pc._head_cut(PIXEL_HEAD) is not None)
+check('masking keeps offsets', len(pc._mask_inert(SPRITE_PAGE)) == len(SPRITE_PAGE))
+check('titles in a template are not page titles', pc.duplicate_tag_issues(soup_of(
+    '<head><title>a</title></head><body><template><title>b</title>'
+    '<div><svg><title>c</title></svg></div></template></body>')) == [])
+check('two real titles are still two', has(pc.duplicate_tag_issues(soup_of(
+    SPRITE_PAGE.replace('<h1>Hi</h1>', '<div><title>Again</title></div><h1>Hi</h1>'))),
+    'Multiple title tags (2)'))
+
+# --- the outline skips dialogs and hidden markup -------------------------------
+QUICK_VIEW = ('<div id="QuickView" x-cloak><div role="dialog" aria-modal="true">'
+              '<h2>Product name</h2><h4>Price</h4></div></div>')
+check('a quick-view dialog ahead of main does not start the outline', pc.heading_issues(
+    result(h1='ok'), soup_of(QUICK_VIEW + '<main><h1>Product</h1><h2>Description</h2></main>')) == [])
+check('dialog, template, hidden and aria-hidden headings are skipped', pc.heading_issues(
+    result(h1='ok'), soup_of('<dialog><h3>a</h3></dialog><template><h2>b</h2></template>'
+                             '<div hidden><h2>c</h2></div><div aria-hidden="true"><h5>d</h5></div>'
+                             '<h1>e</h1><h2>f</h2>')) == [])
+check('a real h2 before the h1 is still flagged', has(pc.heading_issues(
+    result(h1='ok'), soup_of(QUICK_VIEW + '<main><h2>Hero</h2><h1>Product</h1></main>')),
+    'First heading is H2'))
+check('a skip outside any dialog is still flagged', has(pc.heading_issues(
+    result(h1='ok'), soup_of(QUICK_VIEW + '<h1>a</h1><h3>b</h3>')), 'Heading level skips (H1 to H3)'))
+
+# --- alt="" images that are not content imagery --------------------------------
+IMG_PAGE = soup_of(
+    '<header><nav><div class="card"><img alt="" src="/files/promo.jpg">'
+    '<p>Our range</p><a href="/range">Shop now</a></div></nav></header>'
+    '<main><img alt="Waffles" src="//cdn.example.com/files/waffle.png?v=1&width=1780">'
+    '<div class="hidden"><img alt="" src="//cdn.example.com/files/waffle.png?v=1&width=600"></div>'
+    '<section><img alt="" src="/files/lifestyle.jpg"></section>'
+    '<article><header><img alt="" src="/files/feature.jpg"></header></article></main>'
+    '<footer><img alt="" src="/files/badge.png"></footer>')
+imgs = IMG_PAGE.find_all('img')
+described = pc.described_image_paths(imgs)
+by_src = {i['src'].split('?')[0].rsplit('/', 1)[-1] + ('#copy' if 'width=600' in i['src'] else ''): i
+          for i in imgs}
+check('described paths ignore the query', described == {'/files/waffle.png'})
+check('an alt="" copy of a described image is not content',
+      pc.empty_alt_not_content(by_src['waffle.png#copy'], described))
+check('a nav promo card image is not content', pc.empty_alt_not_content(by_src['promo.jpg'], described))
+check('a site footer image is not content', pc.empty_alt_not_content(by_src['badge.png'], described))
+check('a lifestyle image in a section is still content',
+      not pc.empty_alt_not_content(by_src['lifestyle.jpg'], described))
+check("an article's own header is content, not chrome",
+      not pc.empty_alt_not_content(by_src['feature.jpg'], described))
+
 # --- the whole module together ----------------------------------------------
 everything = pc.extra_issues(
     BROKEN_HEAD, soup_of(BROKEN_HEAD), {},

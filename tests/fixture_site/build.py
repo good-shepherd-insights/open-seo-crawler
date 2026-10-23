@@ -88,6 +88,7 @@ def build(base='http://127.0.0.1:8099'):
         '<a href="/old-url/">A page that redirects</a> '
         '<a href="/redirect-links/">Links to redirects</a> '
         '<a href="/placement/">Link placement</a> '
+        '<a href="/inert-markup/">Inert markup</a> '
         '<a href="/noindex-target/">A noindex page</a> '
         '<a href="/accents/">Accented title</a> '
         # Bot readability pages: serve.py answers some crawler user agents
@@ -214,6 +215,32 @@ def build(base='http://127.0.0.1:8099'):
           '<section class="et_pb_fullwidth_header"><a href="/blog/">A hero button</a></section></div>'
           '<div class="site-footer"><a href="/lorem/">A footer link</a></div>'
           '<div class="et-l et-l--header"><a href="/accents/">A theme builder header link</a></div>'
+          '</body></html>')
+    # Inert markup: a theme's sitewide chrome that looks like faults to a raw
+    # read. A tracking pixel's <noscript><img> closes the head early, payment
+    # icons in the footer are inline SVGs with <title> names, the mega menu
+    # sits in a <template>, a quick-view dialog with its own h2 renders ahead
+    # of the main content, and its product image is an alt="" copy of the
+    # described one. None of that is a fault. The one real fault is the
+    # lifestyle photo in a section with alt="".
+    write('/inert-markup/', '<!doctype html><html lang="en-AU"><head><meta charset="utf-8">'
+          '<title>Inert markup</title>'
+          '<meta name="description" content="Sitewide theme chrome that a raw read mistakes for faults: icon titles, a menu template and a quick-view dialog.">'
+          f'{canonical(base + "/inert-markup/")}'
+          '<script>var tpl = "<div><title>in a string</title></div>";</script>'
+          '<noscript><img height="1" width="1" src="/px.gif"></noscript>'
+          '<meta name="x-verify" content="1"></head><body>'
+          '<header><nav><a href="/">Home</a> <a href="/about/">About</a> <a href="/services/">Services</a>'
+          '<template x-if="open"><div class="card"><img alt="" src="/files/promo-card.jpg" width="400" height="300">'
+          '<p>Our range</p><a href="/services/">Shop now</a><svg><title>Arrow</title><path d="M0 0"/></svg>'
+          '</div></template></nav></header>'
+          '<div id="QuickView" x-cloak><div role="dialog" aria-modal="true"><h2>Product name</h2>'
+          '<div class="hidden"><img alt="" src="/files/product.png?width=600" width="600" height="600"></div></div></div>'
+          '<main><h1>Inert markup</h1><img alt="A product on a plate" src="/files/product.png?width=1780" width="1780" height="1780">'
+          '<h2>Details</h2><p>' + ('Copy here. ' * 40) + '</p>'
+          '<section><img alt="" src="/files/lifestyle-photo.jpg" width="800" height="600"></section></main>'
+          '<footer><ul><li><svg role="img" aria-labelledby="pi-a"><title id="pi-a">Card A</title><path d="M0 0"/></svg></li>'
+          '<li><svg role="img" aria-labelledby="pi-b"><title id="pi-b">Card B</title><path d="M0 0"/></svg></li></ul></footer>'
           '</body></html>')
     write('/search/', page(
         f'{NAV}<h1>Search results</h1><p>' + ('Results would appear here. ' * 40) + '</p>',

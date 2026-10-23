@@ -1293,6 +1293,7 @@ _THIRD_PARTY_IMG_HOSTS = (
     'ct.pinterest.com',
     'hs-analytics.net',
     'js.hs-scripts.com',
+    'platform.smile.io',
 )
 _THIRD_PARTY_IMG_FILE_RE = _re.compile(
     r'(?:/recaptcha[/_\-]|recaptcha[_\-](?:black|white|logo)|/g\.gif$|/pixel\.gif$|'
@@ -2462,6 +2463,9 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
         #     (the image doesn't need its own alt for screen readers).
         imgs = soup.find_all('img')
         result['images_total'] = len(imgs)
+        # Paths of images the page describes somewhere, so an alt="" copy of
+        # one (slider clone, quick-view, hidden duplicate) is not flagged.
+        _described_imgs = page_checks.described_image_paths(imgs)
         no_alt_imgs = []              # offending — no alt attr AND not decorative
         no_alt_data = []              # rich per-image records — feeds the missing-alt detail row
         all_images_data = []          # every meaningful image on the page — feeds the All Images panel
@@ -2554,6 +2558,8 @@ def _crawl_page(url, session, domain, pw_renderer=None, ignore_noindex=False, ca
                     else:
                         _classification = 'empty in link'
                 elif _filename_looks_decorative(abs_src):
+                    _classification = 'empty'
+                elif page_checks.empty_alt_not_content(img, _described_imgs):
                     _classification = 'empty'
                 else:
                     _classification = 'empty (likely content)'
